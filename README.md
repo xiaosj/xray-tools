@@ -1,3 +1,8 @@
 # X-Ray Tools
 Set of tools for x-ray analysis.
-Single python file at this stage.
+
+## xraytools.py
+Various tools
+
+# reflectivity.py
+Calculate mirrr reflectivities: uncoated mirror and mirror with single-layer coating

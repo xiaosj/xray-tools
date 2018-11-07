@@ -8,12 +8,18 @@ import xraylib
 def goodID(matID, item=None):
     """ Check if the material ID is defined:
         item = None,    in xraylib;
-             'density', in density dictionary.
+             'density', in density dictionary;
+             'Cp',      in heat capacity dictionary.
     """
     good = True
+    id = matID
     if item == 'density':
         if matID not in Density:
             print('Cannot find the density of ' + matID)
+            good = False
+    if item == 'Cp':
+        if matID not in specificHeatParams:
+            print('Cannot find the specific heat parameters of ' + matID)
             good = False
     else:
         if matID in alias:
@@ -98,10 +104,10 @@ def transmission(matID, t, keV, density=None):
 
 def eVatom(matID, keV, mJ, rms_mm, density=None):
     """ Calculate the eV/atom at given energies
-          E: energies in keV (vectorized)
+          keV: energies in keV (vectorized)
           mJ: pulse energy in mJ (vectorized)
           rms_mm: beam size radius in mm (vectorized)
-             -- E, mJ, rms_mm must match
+             -- E, mJ, rms_mm must match if more than one are vectorized
           density: in g/cm3, None=default density
     """
     if density == None:
@@ -110,8 +116,65 @@ def eVatom(matID, keV, mJ, rms_mm, density=None):
     EdensityJcm3 = mJ/1000 / (2 * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
     atomVolcm3 = atomWeight(matID) / c['NA'] / density
     return EdensityJcm3 * atomVolcm3 / 1.6e-19
-    
 
+
+def intCp(T, A):
+    TT = T / 1000
+    return 1000 * (A[0] * TT + A[1]/2 * TT**2 + A[2]/3 * TT**3 + A[3]/4 * TT**4 - A[4] / TT)
+
+def intCp2(T1, T2, A):
+    return intCp(T2, A) - intCp(T1, A)
+    
+def pulseT(matID, keV, mJ, rms_mm, density=None, baseT=298):
+    """ Calculate the instant temperature rising from single a pulse
+          keV: energies in keV (vectorized)
+          mJ: pulse energy in mJ (vectorized)
+          rms_mm: beam size radius in mm (vectorized)
+             -- E, mJ, rms_mm must match if more than one are vectorized
+          density: in g/cm3, None=default density
+          baseT: base temperature (K), 298 K in default
+    """
+    if density == None:
+        density = defaultDensity(matID)
+    attL = attenuationLength(matID, keV, density)
+    EdensityJcm3 = mJ/1000 / (2 * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
+    EdensityJmol = EdensityJcm3 / (density / molarMass(matID))
+
+    # build temperature as a fuction of J/cm3
+    goodID(matID, 'Cp')
+    CpParam = specificHeatParams[matID]
+    if type(CpParam) is tuple:
+        CpParam = [[baseT, meltPoint[matID], CpParam]]
+
+    idx = -1
+    nzone = len(CpParam)
+    for i in range(nzone):
+        if baseT >= CpParam[0][0] and baseT <= CpParam[0][1]:
+            idx = 1
+            CpParam[0][0] = baseT
+            break
+        else:
+            del CpParam[0]
+    if idx < 0:
+        raise Exception('Base temperature is out of range [{:d}-{:d}] K'.format(int(CpParam[0][0]), int(CpParam[-1][1])))
+    
+    dT = 10
+    T = np.array([])
+    Jmol = np.array([])
+    J0 = 0
+    for i in range(len(CpParam)):
+        Ti = np.arange(CpParam[i][0], CpParam[i][1], dT)
+        Ji = intCp2(CpParam[i][0], Ti, CpParam[i][2]) + J0
+        T = np.concatenate((T, Ti))
+        Jmol = np.concatenate((Jmol, Ji))
+        if i < len(CpParam) - 1:
+            J0 = intCp2(CpParam[i][0], CpParam[i+1][0], CpParam[i][2])
+
+    T_Jmol = interp1d(Jmol , T, fill_value='extrapolate')  # T as function of J/mol
+
+    return T_Jmol(EdensityJmol)
+
+    
 def spectra_cut(spectra, eVrange=(0.0, 0.0)):
     """ Cut spectra to a given energy range """
     if eVrange[1] == 0.0:
@@ -119,47 +182,46 @@ def spectra_cut(spectra, eVrange=(0.0, 0.0)):
         idx2 = -1
     else:
         idx1 = np.argmax(spectra[:,0] >= eVrange[0])
-        idx2 = np.argmax(spectra[:,0] >  eVrange[1])
+        if spectra[-1,0] <= eVrange[1]:
+            idx2 = -1
+        else:
+            idx2 = np.argmax(spectra[:,0] >  eVrange[1])
     return spectra[idx1:idx2]
 
 
-def spectra_bw_power_mW(spectra, eVrange=(0.0,0.0)):
+def spectra_eV_power_mW(spectra, eVrange=(0.0,0.0)):
     spec = spectra_cut(spectra, eVrange)
-    eV1 = spec[:,0]
-    eV0 = np.roll(eV1,1)
-    eV0[0] = 0.0
-    flux_bw = spec[:,1]
-    nW_bin  =  flux_bw * (eV1 - eV0) * 1.6e-7
+    eV = spec[:,0]
+    flux = spec[:,1]
+    nW_bin = [(flux[i]+flux[i+1]) / 2 * (eV[i+1]-eV[i]) * (eV[i+1]+eV[i]) / 2 * 1.6e-10
+              for i in range(len(eV)-1)]
     return np.sum(nW_bin)*1.e-6
 
 
-def spectra_bw_flux(spectra, eVrange=(0.0,0.0)):
+def spectra_eV_flux(spectra, eVrange=(0.0,0.0)):
     spec = spectra_cut(spectra, eVrange)
-    eV1 = spec[:,0]
-    eV0 = np.roll(eV1,1)
-    eV0[0] = 0.0
-    flux_bw = spec[:,1]
-    flux_eV = flux_bw / (eV1 * 0.001)
-    flux_bin = flux_eV * (eV1 - eV0)
+    eV = spec[:,0]
+    flux = spec[:,1]
+    flux_bin = [(flux[i] + flux[i+1]) / 2 * (eV[i+1] - eV[i]) for i in range(len(eV)-1)]
     return np.sum(flux_bin)
 
 
 def spectra_flux(spectra, eVrange=(0.0,0.0), specType='bw'):
-    if specType == 'bw':
-        return spectra_bw_flux(spectra, eVrange)
+    if specType == 'eV':
+        return spectra_eV_flux(spectra, eVrange)
     else:
         spec = np.copy(spectra)
-        spec[:,1] = spectra[:,1] * (spectra[:,0] * 0.001)
-        return spectra_bw_flux(spec, eVrange)
+        spec[:,1] = spectra[:,1] / (spectra[:,0] * 0.001)
+        return spectra_eV_flux(spec, eVrange)
 
 
 def spectra_power_mW(spectra, eVrange=(0.0,0.0), specType='bw'):
-    if specType == 'bw':
-        return spectra_bw_power_mW(spectra, eVrange)
+    if specType == 'eV':
+        return spectra_eV_power_mW(spectra, eVrange)
     else:
         spec = np.copy(spectra)
-        spec[:,1] = spectra[:,1] * (spectra[:,0] * 0.001)
-        return spectra_bw_power_mW(spec, eVrange)
+        spec[:,1] = spectra[:,1] / (spectra[:,0] * 0.001)
+        return spectra_eV_power_mW(spec, eVrange)
 
 
 def specdose(spectra, area_cm2, eVrange=(0.0,0.0), specType='eV', particle='photon'):
@@ -708,11 +770,11 @@ Density = {'H' :0.00008988,
      'CVD':3.515,
      'H2O':1.0,
      'B4C':2.52,
-     'SiC':3.217,
      'SiO2':2.2,
      'Al2O3':3.97,
      'ZnSe':5.42,
      'BeO':3.01,
+     'SiC':3.21,
      'ZnTe':6.34,
      'CdS':6.749,
      'CdSe':7.01,
@@ -1024,7 +1086,6 @@ meltDose = {'Li':0.043,
      'Y3Al5O12':0.449,
      'CuBe':0.308,
      'ZnO':0.405,
-     'SiC2':1.006,
      'SiO2':1.22,
      'AlN':0.213,
      'Si3N4':0.187,
@@ -1317,18 +1378,11 @@ latticeParameters = {'H' :(3.75,3.75,6.12,90,90,120),
      'Gd3Ga5O12':(12.383,12.383,12.383,90,90,90)
 }
 
-# Rhombohedral Lattice parameter (z)
-#latticeParamsRhomb = {'B' :,
-#     'As':,
-#     'Sb':,
-#     'Hg':,
-#     'Bi':,
-#     'LaAlO3':
-#}
  
 # specific heat capacity coefficients
 # Shomate equation
 # Cp = A + B*T + C*T^2 + D*T^3 + E/T^2
+#   T = temperature(K)/1000
 
 specificHeatParams = {'Li' :(169.552,-882.711,1977.438,-1487.312,-1.609635),
     'Be':(21.20694,5.68819,0.968019,-0.001749,-0.587526),
@@ -1368,7 +1422,8 @@ specificHeatParams = {'Li' :(169.552,-882.711,1977.438,-1487.312,-1.609635),
     'Pb':(25.0145,5.441836,4.061367,-1.236214,-0.010657),
     'Bi':(25.52,0,0,0,0),
     'B4C':(95.99853,23.16513,-0.409604,0.081414,-4.395208),
-    'SiC':(20.55859,64.57962,-52.98827,16.95813,-0.781847),
+    'SiC':[[298, 1000, (20.55859,64.57962,-52.98827,16.95813,-0.781847)],
+           [1000,4000, (46.90222,5.845968,-1.085410,0.093021,-3.448876)]],
     'Al2O3':(102.429,38.7498,-15.9109,2.628181,-3.007551),
     'ZnSe':(48.9,0,0,0,0),
     'ZnTe':(50.95,0,0,0,0),

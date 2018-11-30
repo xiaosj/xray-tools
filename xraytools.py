@@ -1,5 +1,6 @@
 # utility functions for xray studies
 
+import os
 import numpy as np
 from scipy.interpolate import interp1d
 import xraylib
@@ -126,7 +127,7 @@ def intCp2(T1, T2, A):
     return intCp(T2, A) - intCp(T1, A)
     
 def pulseT(matID, keV, mJ, rms_mm, density=None, baseT=298):
-    """ Calculate the instant temperature rising from single a pulse
+    """ Calculate the instant temperature from single a pulse
           keV: energies in keV (vectorized)
           mJ: pulse energy in mJ (vectorized)
           rms_mm: beam size radius in mm (vectorized)
@@ -137,7 +138,7 @@ def pulseT(matID, keV, mJ, rms_mm, density=None, baseT=298):
     if density == None:
         density = defaultDensity(matID)
     attL = attenuationLength(matID, keV, density)
-    EdensityJcm3 = mJ/1000 / (2 * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
+    EdensityJcm3 = mJ / 1000. / (2. * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
     EdensityJmol = EdensityJcm3 / (density / molarMass(matID))
 
     # build temperature as a fuction of J/cm3
@@ -146,17 +147,17 @@ def pulseT(matID, keV, mJ, rms_mm, density=None, baseT=298):
     if type(CpParam) is tuple:
         CpParam = [[baseT, meltPoint[matID], CpParam]]
 
-    idx = -1
+    if baseT < CpParam[0][0]:
+        CpParam[0][0] = baseT
+    if baseT > CpParam[-1][1]:
+        raise Exception('Base temperature cannot be higher than the melting point of {:s} ({:d} K)'.format(matID, int(CpParam[-1][1])))
     nzone = len(CpParam)
     for i in range(nzone):
         if baseT >= CpParam[0][0] and baseT <= CpParam[0][1]:
-            idx = 1
             CpParam[0][0] = baseT
             break
         else:
             del CpParam[0]
-    if idx < 0:
-        raise Exception('Base temperature is out of range [{:d}-{:d}] K'.format(int(CpParam[0][0]), int(CpParam[-1][1])))
     
     dT = 10
     T = np.array([])
@@ -175,22 +176,22 @@ def pulseT(matID, keV, mJ, rms_mm, density=None, baseT=298):
     return T_Jmol(EdensityJmol)
 
     
-def spectra_cut(spectra, eVrange=(0.0, 0.0)):
-    """ Cut spectra to a given energy range """
+def spectrum_cut(spectrum, eVrange=(0.0, 0.0)):
+    """ Cut spectrum to a given energy range """
     if eVrange[1] == 0.0:
         idx1 = 0
         idx2 = -1
     else:
-        idx1 = np.argmax(spectra[:,0] >= eVrange[0])
-        if spectra[-1,0] <= eVrange[1]:
+        idx1 = np.argmax(spectrum[:,0] >= eVrange[0])
+        if spectrum[-1,0] <= eVrange[1]:
             idx2 = -1
         else:
-            idx2 = np.argmax(spectra[:,0] >  eVrange[1])
-    return spectra[idx1:idx2]
+            idx2 = np.argmax(spectrum[:,0] >  eVrange[1])
+    return spectrum[idx1:idx2]
 
 
-def spectra_eV_power_mW(spectra, eVrange=(0.0,0.0)):
-    spec = spectra_cut(spectra, eVrange)
+def spectrum_eV_power_mW(spectrum, eVrange=(0.0,0.0)):
+    spec = spectrum_cut(spectrum, eVrange)
     eV = spec[:,0]
     flux = spec[:,1]
     nW_bin = [(flux[i]+flux[i+1]) / 2 * (eV[i+1]-eV[i]) * (eV[i+1]+eV[i]) / 2 * 1.6e-10
@@ -198,44 +199,48 @@ def spectra_eV_power_mW(spectra, eVrange=(0.0,0.0)):
     return np.sum(nW_bin)*1.e-6
 
 
-def spectra_eV_flux(spectra, eVrange=(0.0,0.0)):
-    spec = spectra_cut(spectra, eVrange)
+def spectrum_eV_flux(spectrum, eVrange=(0.0,0.0)):
+    spec = spectrum_cut(spectrum, eVrange)
     eV = spec[:,0]
     flux = spec[:,1]
     flux_bin = [(flux[i] + flux[i+1]) / 2 * (eV[i+1] - eV[i]) for i in range(len(eV)-1)]
     return np.sum(flux_bin)
 
 
-def spectra_flux(spectra, eVrange=(0.0,0.0), specType='bw'):
+def spectrum_flux(spectrum, eVrange=(0.0,0.0), specType='bw'):
     if specType == 'eV':
-        return spectra_eV_flux(spectra, eVrange)
+        return spectrum_eV_flux(spectrum, eVrange)
     else:
-        spec = np.copy(spectra)
-        spec[:,1] = spectra[:,1] / (spectra[:,0] * 0.001)
-        return spectra_eV_flux(spec, eVrange)
+        spec = np.copy(spectrum)
+        spec[:,1] = spectrum[:,1] / (spectrum[:,0] * 0.001)
+        return spectrum_eV_flux(spec, eVrange)
 
 
-def spectra_power_mW(spectra, eVrange=(0.0,0.0), specType='bw'):
+def spectrum_power_mW(spectrum, eVrange=(0.0,0.0), specType='bw'):
     if specType == 'eV':
-        return spectra_eV_power_mW(spectra, eVrange)
+        return spectrum_eV_power_mW(spectrum, eVrange)
     else:
-        spec = np.copy(spectra)
-        spec[:,1] = spectra[:,1] / (spectra[:,0] * 0.001)
-        return spectra_eV_power_mW(spec, eVrange)
+        spec = np.copy(spectrum)
+        spec[:,1] = spectrum[:,1] / (spectrum[:,0] * 0.001)
+        return spectrum_eV_power_mW(spec, eVrange)
 
 
-def specdose(spectra, area_cm2, eVrange=(0.0,0.0), specType='eV', particle='photon'):
-    spec = spectra_cut(spectra, eVrange)
-    eV1 = spec[:,0]
-    eV0 = np.roll(eV1, 1)
-    eV0[0] = 0.0
+def spectrum_dose(spectrum, area_cm2, eVrange=(0.0,0.0), specType='eV', particle='photon'):
+    """
+       spectrum: [eV, flux]
+       area_cm2: area of spot
+       return dose in mrem/h
+    """
+    spec = spectrum_cut(spectrum, eVrange)
+    eV = spec[:,0]
     if specType == 'bw':
-        flux_eV = spec[:,1] / (eV1 * 0.001)
+        flux_eV = spec[:,1] / (eV * 0.001)
     else:
         flux_eV = spec[:,1]
 
     # Load flux to dose 
-    f2d = np.loadtxt('f2d_' + particle)
+    path = os.path.dirname(os.path.abspath(__file__))
+    f2d = np.loadtxt(path+'/f2d_' + particle)
     f2d[:,0] *= 1.0E9    # from GeV to eV
     f2d[:,1] *= 3.6E-4   # from pSv/s to mrem/h
     
@@ -244,12 +249,68 @@ def specdose(spectra, area_cm2, eVrange=(0.0,0.0), specType='eV', particle='phot
     f_logf2d = interp1d(logf2d[:,0], logf2d[:,1],
         bounds_error=False, fill_value='extrapolate', assume_sorted=True)
     
-    dE = eV1 - eV0
-    dose = flux_eV * dE * np.exp(f_logf2d(np.log(eV1)))
+    d = np.exp(f_logf2d(np.log(eV))) * flux_eV
+    dose_bin = [(d[i] + d[i+1]) / 2 * (eV[i+1] - eV[i]) for i in range(len(eV)-1)]
     
-    return sum(dose) / area_cm2
+    return np.sum(dose_bin) / area_cm2
     
 
+def spectrum_shield(spectrum, area_cm2, matID, density=None, eVrange=(0.0,0.0), specType='eV',
+                    dose_limit=0.05, dt_limit=0.01, particle='photon', verbose=0):
+    """
+    Retrun required shielidng in mm
+       spectrum:   [eV, flux]
+       area_cm2:   area of spot
+       matID:      shielding material ID
+       density:    density of shielding material, use the default density if not specified
+       eVrange:    cut the spectrum to the given range
+       specType:   type of spectrum, 'eV', flux/eV or 'bw', flux/0.1%bw
+       dose_limit: shielding goal, 0.05 mrem/h by default
+       dt_limit:   smallest shielding thickness step
+       particle:   type of particle
+       verbose:    output details if > 1
+    """
+    spec = spectrum_cut(spectrum, eVrange)
+    al = np.array([attenuationLength(matID, eV/1000, density=density) for eV in spec[:,0]]) * 1000
+    
+    d = spectrum_dose(spec, area_cm2, specType=specType)
+    if verbose > 0:
+        print('Dose without shielding is {:.3g} mrem/h'.format(d))
+    
+    if d < dose_limit:
+        if verbose > 0:
+            print('No shielding is needed.')
+        return 0.
+    
+    else:
+        t0 = 0.
+        t1 = 1.
+        while True:   # find the upper bound of shielding
+            spec_trans = np.copy(spec)
+            spec_trans[:,1] *= np.exp(-t1/al)
+            d = spectrum_dose(spec_trans, area_cm2, specType=specType)
+            if d >= dose_limit:
+                t0 = t1
+                t1 *= 2
+            else:
+                break
+        
+        while t1 - t0 >= dt_limit:
+            t = (t0 + t1) * 0.5
+            spec_trans = np.copy(spec)
+            spec_trans[:,1] *= np.exp(-t/al)
+            d = spectrum_dose(spec_trans, area_cm2, specType=specType)
+            if verbose > 0:
+                print('  Dose after {:.3f} mm {:s} is {:.3f} mrem/h'.format(t, matID, d))
+            if d > dose_limit:
+                t0 = t
+            else:
+                t1 = t
+    
+        if verbose > 0:
+            print('Required {:s} thickness is {:.3f} mm'.format(matID, t1))
+    
+    return t1
     
     
 """ Define units and constants

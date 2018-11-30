@@ -2,7 +2,7 @@
 Set of tools for x-ray analysis.
 
 ## xraytools.py
-Various tools
+Various tools for x-ray calculations
 
 ## reflectivity.py
-Calculate mirrr reflectivities: uncoated mirror and mirror with single-layer coating
+Calculate mirror reflectivities: uncoated mirror and mirror with single-layer coating

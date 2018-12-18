@@ -116,7 +116,8 @@ def eVatom(matID, keV, mJ, rms_mm, density=None):
     attL = attenuationLength(matID, keV, density)
     EdensityJcm3 = mJ/1000 / (2 * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
     atomVolcm3 = atomWeight(matID) / c['NA'] / density
-    return EdensityJcm3 * atomVolcm3 / 1.6e-19
+    natom = xraylib.CompoundParser(goodID(matID))['nAtomsAll']
+    return EdensityJcm3 * atomVolcm3 / natom / 1.6e-19
 
 
 def intCp(T, A):
@@ -1485,6 +1486,8 @@ specificHeatParams = {'Li' :(169.552,-882.711,1977.438,-1487.312,-1.609635),
     'B4C':(95.99853,23.16513,-0.409604,0.081414,-4.395208),
     'SiC':[[298, 1000, (20.55859,64.57962,-52.98827,16.95813,-0.781847)],
            [1000,4000, (46.90222,5.845968,-1.085410,0.093021,-3.448876)]],
+    'BeO':[[298,  800, (3.358974,131.5922,-140.4937,56.20953,-0.536669)],
+           [800, 2780, (47.06205,5.598359,-0.495570,0.054527,-2.947373)]],
     'Al2O3':(102.429,38.7498,-15.9109,2.628181,-3.007551),
     'ZnSe':(48.9,0,0,0,0),
     'ZnTe':(50.95,0,0,0,0),

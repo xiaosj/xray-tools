@@ -127,8 +127,8 @@ def intCp(T, A):
 def intCp2(T1, T2, A):
     return intCp(T2, A) - intCp(T1, A)
     
-def pulseT(matID, keV, mJ, rms_mm, density=None, baseT=298):
-    """ Calculate the instant temperature from single a pulse
+def pulseT(matID, keV, mJ, rms_mm, density=None, baseT=298.15):
+    """ Calculate the instant temperature (K) from single a pulse
           keV: energies in keV (vectorized)
           mJ: pulse energy in mJ (vectorized)
           rms_mm: beam size radius in mm (vectorized)
@@ -176,19 +176,34 @@ def pulseT(matID, keV, mJ, rms_mm, density=None, baseT=298):
 
     return T_Jmol(EdensityJmol)
 
-    
+
+def pulseTC(matID, keV, mJ, rms_mm, density=None, baseT=25):
+    """ Calculate the instant temperature (C) from single a pulse
+          keV: energies in keV (vectorized)
+          mJ: pulse energy in mJ (vectorized)
+          rms_mm: beam size radius in mm (vectorized)
+             -- E, mJ, rms_mm must match if more than one are vectorized
+          density: in g/cm3, None=default density
+          baseT: base temperature (C), 25 C in default
+    """
+    return K2C(pulseT(matID, keV, mJ, rms_mm, density=None, baseT=C2K(baseT)))
+
+
 def spectrum_cut(spectrum, eVrange=(0.0, 0.0)):
-    """ Cut spectrum to a given energy range """
+    """ Cut spectrum to a given energy range; return [0,0] if out of range """
     if eVrange[1] == 0.0:
-        idx1 = 0
-        idx2 = -1
+        return spectrum
     else:
-        idx1 = np.argmax(spectrum[:,0] >= eVrange[0])
-        if spectrum[-1,0] <= eVrange[1]:
-            idx2 = -1
+        if spectrum[-1,0] <= eVrange[0] or spectrum[0,0] >= eVrange[1]:
+            return np.array([[0, 0]], dtype=np.float)
         else:
+            idx1 = np.argmax(spectrum[:,0] >= eVrange[0])
             idx2 = np.argmax(spectrum[:,0] >  eVrange[1])
-    return spectrum[idx1:idx2]
+            if spectrum[0,0] >= eVrange[0]:
+                idx1 = 0
+            if spectrum[-1,0] <= eVrange[1]:
+                idx2 = -1
+            return spectrum[idx1:idx2]
 
 
 def spectrum_eV_power_mW(spectrum, eVrange=(0.0,0.0)):
@@ -312,8 +327,18 @@ def spectrum_shield(spectrum, area_cm2, matID, density=None, eVrange=(0.0,0.0), 
             print('Required {:s} thickness is {:.3f} mm'.format(matID, t1))
     
     return t1
-    
-    
+
+
+def C2K(degC):
+    ''' Convert Celsius to Kelvin '''
+    return degC + 273.15
+
+
+def K2C(degK):
+    ''' Convert Kelvin to Celsius '''
+    return degK - 273.15
+
+
 """ Define units and constants
     - Muliply to convert from SI unit to the target unit:
         e.g. a*u['cm'] to get from m to cm

@@ -117,7 +117,7 @@ def eVatom(matID, keV, mJ, rms_mm, density=None):
     EdensityJcm3 = mJ/1000 / (2 * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
     atomVolcm3 = atomWeight(matID) / c['NA'] / density
     natom = xraylib.CompoundParser(goodID(matID))['nAtomsAll']
-    return EdensityJcm3 * atomVolcm3 / natom / 1.6e-19
+    return EdensityJcm3 * atomVolcm3 / 1.6e-19
 
 
 def intCp(T, A):
@@ -172,7 +172,7 @@ def pulseT(matID, keV, mJ, rms_mm, density=None, baseT=298.15):
         if i < len(CpParam) - 1:
             J0 = intCp2(CpParam[i][0], CpParam[i+1][0], CpParam[i][2])
 
-    T_Jmol = interp1d(Jmol , T, fill_value='extrapolate')  # T as function of J/mol
+    T_Jmol = interp1d(Jmol, T, fill_value='extrapolate')  # T as function of J/mol
 
     return T_Jmol(EdensityJmol)
 
@@ -1012,7 +1012,9 @@ meltPoint = {'H' :14.175,
      'LaMnO3':523,  # 523 K phase trans, melt point is 2170 K
      'La0.5Ca0.5MnO3':1300,  
      'La0.7Sr0.3MnO3':370, # ferro to para magnetic phase transition
-     'LaAlO3':708      # 708 K phase trans, melt point is 2350 K
+     'LaAlO3':708,      # 708 K phase trans, melt point is 2350 K
+     'B4C':2743,
+     'SiC':3100
 }
 
 # Boiling point in K 

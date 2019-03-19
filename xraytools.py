@@ -116,7 +116,6 @@ def eVatom(matID, keV, mJ, rms_mm, density=None):
     attL = attenuationLength(matID, keV, density)
     EdensityJcm3 = mJ/1000 / (2 * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
     atomVolcm3 = atomWeight(matID) / c['NA'] / density
-    natom = xraylib.CompoundParser(goodID(matID))['nAtomsAll']
     return EdensityJcm3 * atomVolcm3 / 1.6e-19
 
 
@@ -907,7 +906,9 @@ Density = {'H' :0.00008988,
      'CHN.3O7.6':1.06,
      'C1.5H0.3O4.3N0.4PCa2.2':1.92,
      'Be0.9983O0.0003Al0.0001Ca0.0002C0.0003Cr0.000035Co0.000005Cu0.00005Fe0.0003Pb0.000005Mg0.00006Mn0.00003Mo0.00001Ni0.0002Si0.0001Ag0.000005Ti0.00001Zn0.0001':1.85,
-     'Be.994O.004Al.0005B.000003Cd.0000002Ca.0001C.0006Cr.0001Co.00001Cu.0001Fe.0008Pb.00002Li.000003Mg.00049Mn.0001Mo.00002Ni.0002N.0003Si.0004Ag.00001':1.85
+     'Be.994O.004Al.0005B.000003Cd.0000002Ca.0001C.0006Cr.0001Co.00001Cu.0001Fe.0008Pb.00002Li.000003Mg.00049Mn.0001Mo.00002Ni.0002N.0003Si.0004Ag.00001':1.85,
+     'Air':0.001225,
+     'air':0.001225
 }
 
  
@@ -1368,7 +1369,6 @@ latticeType = {'H' :'hcp',
      'InAs':'zinc',
      'InSb':'zinc',
      'LaMnO3':'ortho',
-     'LaAlO3':'rhomb',
      'LaAlO3':'rhomb',
      'La0.7Sr0.3MnO3':'rhomb',
      'GGG':'cubic'

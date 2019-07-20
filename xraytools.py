@@ -3,6 +3,8 @@
 import os
 import numpy as np
 from scipy.interpolate import interp1d
+import matplotlib.pyplot as plt
+from matplotlib.ticker import ScalarFormatter
 import xraylib
 
 
@@ -76,14 +78,14 @@ def mu(matID, keV, density=None):
     if density == None:
         density = defaultDensity(matID)
     if np.isscalar(keV):
-        energies = np.array([keV])
+        energies = np.array([keV], dtype=np.double)
     else:
-        energies = np.array(keV)
-    mu = np.array([xraylib.CS_Total_CP(mat, eng) * density * u['cm'] for eng in energies])
+        energies = np.array(keV, dtype=np.double)
+    _mu = np.array([xraylib.CS_Total_CP(mat, eng) * density * u['cm'] for eng in energies])
     if np.isscalar(keV):
-        return np.asscalar(mu)
+        return np.asscalar(_mu)
     else:
-        return mu
+        return _mu
 
 
 def attenuationLength(matID, keV, density=None):
@@ -119,6 +121,57 @@ def eVatom(matID, keV, mJ, rms_mm, density=None):
     return EdensityJcm3 * atomVolcm3 / 1.6e-19
 
 
+def eVatom_keV_plot(matID, keV, mJ, rms_mm, density=None, logx=False, logy=True):
+    if not isinstance(matID, list):
+        matID = [matID]
+    
+    xlist = None
+    inp_names = ['keV', 'mJ', 'rms_mm']
+    for inp, name in zip([keV, mJ, rms_mm], inp_names):
+        if isinstance(inp, (np.ndarray, list)):
+            if xlist is None:
+                xlist = inp
+                xlabel = name
+            else:
+                raise Exception('Only one variable of keV, mJ and rms_mm can be an array or list.')
+    
+    if xlist is None:
+        for mat in matID:
+            eVatoms = eVatom(mat, keV, mJ, rms_mm, density)
+            print('{:s}: {:.2g} eV/atom'.format(mat, eVatoms))
+    else:
+        plt.figure(figsize=(5,3), dpi=100, facecolor='white')
+        for mat in matID:
+            eVatoms = eVatom(mat, keV, mJ, rms_mm, density)
+            if logx:
+                if logy:
+                    plt.loglog(xlist, eVatoms, label=mat)
+                else:
+                    plt.semilogx(xlist, eVatoms, label=mat)
+                    plt.ylim(0)
+                plt.gca().xaxis.set_major_formatter(ScalarFormatter())
+            else:
+                if logy:
+                    plt.semilogy(xlist, eVatoms, label=mat)
+                else:
+                    plt.plot(xlist, eVatoms, label=mat)
+                    plt.ylim(0)
+
+        if xlabel=='keV':
+            plt.title('Dose from {:.1f} mJ {:.2g} mm (rms) pulse'.format(mJ, rms_mm))
+        elif xlabel=='mJ':
+            plt.title('Dose from {:.1f} keV {:.2g} mm (rms) pulse'.format(keV, rms_mm))
+        elif xlabel=='rms_mm':
+            plt.title('Dose from {:.1f} keV {:.1f} mJ pulse'.format(keV, mJ))
+        
+        plt.xlabel(xlabel)
+        plt.ylabel('eV/atom')
+        plt.grid(axis='both', which='both')
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
+
 def intCp(T, A):
     TT = T / 1000
     return 1000 * (A[0] * TT + A[1]/2 * TT**2 + A[2]/3 * TT**3 + A[3]/4 * TT**4 - A[4] / TT)
@@ -127,13 +180,13 @@ def intCp2(T1, T2, A):
     return intCp(T2, A) - intCp(T1, A)
     
 def pulseT(matID, keV, mJ, rms_mm, density=None, baseT=298.15):
-    """ Calculate the instant temperature (K) from single a pulse
-          keV: energies in keV (vectorized)
-          mJ: pulse energy in mJ (vectorized)
-          rms_mm: beam size radius in mm (vectorized)
-             -- E, mJ, rms_mm must match if more than one are vectorized
-          density: in g/cm3, None=default density
-          baseT: base temperature (K), 298 K in default
+    """ Calculate the instant temperature (K) from single pulse
+        * keV: energies in keV (vectorized)
+        * mJ: pulse energy in mJ (vectorized)
+        * rms_mm: beam size radius in mm (vectorized)
+            -- Size E, mJ, rms_mm must match if more than one are vectorized
+        * density: in g/cm3, None=default density
+        * baseT: base temperature (K), 298 K in default
     """
     if density == None:
         density = defaultDensity(matID)
@@ -177,15 +230,15 @@ def pulseT(matID, keV, mJ, rms_mm, density=None, baseT=298.15):
 
 
 def pulseTC(matID, keV, mJ, rms_mm, density=None, baseT=25):
-    """ Calculate the instant temperature (C) from single a pulse
-          keV: energies in keV (vectorized)
-          mJ: pulse energy in mJ (vectorized)
-          rms_mm: beam size radius in mm (vectorized)
-             -- E, mJ, rms_mm must match if more than one are vectorized
-          density: in g/cm3, None=default density
-          baseT: base temperature (C), 25 C in default
+    """ Calculate the instant temperature (C) from single pulse
+        * keV: energies in keV (vectorized)
+        * mJ: pulse energy in mJ (vectorized)
+        * rms_mm: beam size radius in mm (vectorized)
+            -- Size of E, mJ, rms_mm must match if more than one are vectorized
+        * density: in g/cm3, None=default density
+        * baseT: base temperature (K), 298 K in default
     """
-    return K2C(pulseT(matID, keV, mJ, rms_mm, density=None, baseT=C2K(baseT)))
+    return K2C(pulseT(matID, keV, mJ, rms_mm, density=density, baseT=C2K(baseT)))
 
 
 def spectrum_cut(spectrum, eVrange=(0.0, 0.0)):
@@ -1472,7 +1525,6 @@ latticeParameters = {'H' :(3.75,3.75,6.12,90,90,120),
 # Shomate equation
 # Cp = A + B*T + C*T^2 + D*T^3 + E/T^2
 #   T = temperature(K)/1000
-
 specificHeatParams = {'Li' :(169.552,-882.711,1977.438,-1487.312,-1.609635),
     'Be':(21.20694,5.68819,0.968019,-0.001749,-0.587526),
      'B':(10.18574,29.24415,-18.02137,4.212326,-0.551),
@@ -1539,5 +1591,11 @@ specificHeatParams = {'Li' :(169.552,-882.711,1977.438,-1487.312,-1.609635),
     'SiO2':(-6.07659,251.6755,-324.796,168.5604,0.002548),
     'LaAlO3':(86.6,0,0,0,0),
     'LaMnO3':(89,0,0,0,0),
-    'La0.5Ca0.5MnO3':(89,0,0,0,0),
+    'La0.5Ca0.5MnO3':(89,0,0,0,0)
+}
+
+# Latent heat in kJ/mol
+# (Heat of Fusion, Heat of Vaporization)
+latentHeat = {'Fe': (13.81, 340),
+    'H2O': (4.0)
 }

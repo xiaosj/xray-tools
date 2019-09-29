@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Transmission through Solid</title>
+</head>
+
+<!-- <script src="//cdnjs.cloudflare.com/ajax/libs/dygraph/2.1.0/dygraph.min.js"></script> -->
+<script src="dygraph.min.js"></script>
+<script src="AtomicDensities_NIST5632.js"></script>
+
+<script>
+var densities = AtomicDensities_NIST5632;
+
+// Validate element input
+function validateSymbol() {
+    Symbol = document.getElementById('symbol').value;
+    if(Symbol in densities) {
+        defaultDensity = densities[Symbol];
+        document.getElementById('density').disabled = false;
+        document.getElementById('default_density').innerHTML = defaultDensity;
+        setDensity();
+    } else {
+        document.getElementById('density').disabled = true;
+        document.getElementById('default_density').innerHTML = 'None';
+    }
+}
+
+function setDensity() {
+    density = parseFloat(document.getElementById('Density_input'.value));
+    if(density < 0) {
+        density = defaultDensity;
+    }
+    drawIt();
+}
+
+function setThickness() {
+    drawIt();
+}
+
+// Draw the transmission curve
+function drawIt() {
+
+}
+</script>
+
+<body onload="validateSymbol();">
+Element symbol: <input id="symbol" type="text" value="Fe" onchange="validateSymbol();"><br>
+Density: <input id="density" type="number" value="-1.0" onchange="setDensity();">
+(negative for default density: <label id="default_density"></label> g/cm3)<br>
+Thickness: <input id='thickness' type="number" value="1.0" min="0.0" onchange="setThickness();"> mm<br>
+</body>
+</html>

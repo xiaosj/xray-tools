@@ -22,11 +22,12 @@ var default_Tmin = 1.0;
 var xsec;
 var xmin, xmax, nx;
 var xlist, ylist;
+var graph;
 
 // Validate element input
 function validateSymbol() {
     symbol = document.getElementById('symbol').value;
-    if(symbol in densities) {
+    if(symbol in densities && symbol in xSections) {
         defaultDensity = densities[symbol];
         document.getElementById('density').disabled = false;
         document.getElementById('default_density').innerHTML = defaultDensity;
@@ -73,7 +74,6 @@ function chooseX(choice) {
         document.getElementById('xmax').defaultValue = 10.0;
         document.getElementById('range_unit').innerHTML = 'mm'       
     }
-    updateFixedVairiable();
 }
 
 function updateFixedVairiable() {
@@ -84,6 +84,14 @@ function updateX() {
 }
 
 // Draw the transmission curve
+function setLogScale() {
+    var logx = document.getElementById('logx').checked;
+    graph.updateOptions({axes: { x: { logscale: logx} } });
+
+    var logy = document.getElementById('logy').checked;
+    graph.updateOptions({ logscale: logy });
+}
+
 function drawIt() {
     var x_label, y_label;
     if(xType == 0) {
@@ -99,14 +107,13 @@ function drawIt() {
         drawdata.push([xsec[0][i], xsec[1][i]]);
     }
 
-    var g = new Dygraph(document.getElementById('graphdiv'), drawdata,
+    graph = new Dygraph(document.getElementById('graphdiv'), drawdata,
         {
             xlabel: x_label,
-            axes: { x: { logscale: true} },
-            ylabel: y_label,
-            logscale: true
+            ylabel: y_label
         }
     );
+    setLogScale();
 }
 </script>
 
@@ -132,6 +139,10 @@ Draw as function of:
 <label id="range_unit"></label>, in 
 <input id='nx' type="number" value=100 onchange="updateX();"> steps<br>
 
+<br>
+<input id="logx" type="checkbox" checked=true onchange="setLogScale();"> log X
+<input id="logy" type="checkbox" checked=true onchange="setLogScale();"> log Y
+<br>
 <br>
 <div id="graphdiv"></div>
 <br>

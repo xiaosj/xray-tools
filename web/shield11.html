@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>SHIED11 Web Calculator (Alpha)</title>
+<link rel="stylesheet" type="text/css" href="shield11.css">
+<link rel="stylesheet" href="dygraph.css">
+</head>
+
+<script src="shield11.js"></script>
+<script src="dygraph.min.js"></script>
+
+<body onload="updateAll();">
+<div id="header">
+<h1>SHIELD11 Web Calculator</h1>
+<h4 align="right">Alpha on November 19, 2016 by Shanjie Xiao @ SLAC</h4>
+<h5 id="disclosure">DISCLOSURE: The SHIELD11 code has been developed at SLAC under the sponsorship of the U.S. Government.  Neither the U.S. nor the U.S.D.O.E., nor the Leland Stanford Junior University, nor their employees, nor their respective contractors, subcontractors, or their employees, makes any warranty, express or implied, or assumes any liability or responsibility for accuracy, completeness or usefulness of any information, apparatus, product or process disclosed, or represents that its use will not infringe privately-owned rights.  Mention of any product, its manufacturer, or suppliers shall not, nor is it intended to, imply approval, disapproval, or fitness for any par- ticular use.  A royalty-free, non-exclusive right to use and dis-seminate same for any purpose whatsoever is expressly reserved to the U.S. and the University.</h5>
+</div>
+<div id="container">
+<div id="inputdiv">
+  <fieldset>
+    <legend>Electron Beam</legend>
+    <table>
+      <tr><td>Energy: </td>
+          <td><input class="inpnum" id="Ebeam" type="number" value="3.0" min="0.01" step="any" onchange="updateAll();"></td>
+          <td>GeV</td></tr>
+      <tr><td>
+            <select id="powerMode" onchange="powerModeChange();">
+              <option value="Power" selected="selected">Power</option>
+              <option value="Current">Current</option>
+            </select>
+          </td>
+          <td><input class="inpnum" id="power" type="number" value="1.0" min="0" step="any" onchange="updateAll();"></td>
+          <td id="powerunit">W</td>
+      </tr>
+    </table>
+  </fieldset>
+  <p><input type="radio" name="unitType" id="unit_SI" onchange="unitChange();">SI Unit
+      <input type="radio" name="unitType" id="unit_US" checked="checked" onchange="unitChange();">US Unit
+      <input type="checkbox" id="autoConv" checked="checked">Auto Conv.
+  </p>
+  <fieldset>
+    <legend>Target</legend>
+    <table>
+      <tr><td>Material</td>
+          <td>
+            <select id="NamTar" onchange="updateAll();">
+              <option value="0">Concrete</option>
+              <option value="1" selected="selected">Iron</option>
+              <option value="2">Lead</option>
+              <option value="3">Misc</option>
+            </select></td></tr>
+      <tr><td>Length</td>
+          <td><input class="inpL" id="TarLen" type="number" value="12.00" min="0" step="any" onchange="updateAll();"></td>
+          <td class="lunit">inch</td></tr>
+      <tr><td>Radius</td>
+          <td><input class="inpL" id="TarRad" type="number" value="2.00" min="0" step="any" onchange="updateAll();"></td>
+          <td class="lunit">inch</td></tr>
+      <tr><td>Neutron Attenuation</td>
+          <td><input id="IattSW" type="checkbox" onclick="updateAll();"></td></tr>
+    </table>
+  </fieldset>
+  <br>
+  <fieldset>
+    <legend>Shielding</legend>
+    <table>
+      <tr><td>Material</td>
+          <td>
+            <select id="NamShl" colspan="0" onchange="updateAll();">
+              <option value="0" selected="selected">Concrete</option>
+              <option value="1">Iron</option>
+              <option value="2">Lead</option>
+              <option value="3">Other</option>
+            </select></td></tr>
+      <tr><td>Angle</td>
+          <td><input class="inpnum" id="AngShl" type="number" value="90.0" min="0.0" max="180.0" step="any" onchange="updateAll();"></td><td>deg</td></tr>
+      <tr><td>Distance</td>
+          <td><input class="inpL" id="DisShl" type="number" value="40.0" min="0" step="any" onchange="updateAll();"></td>
+          <td class="lunit">inch</td></tr>
+      <tr><td>Thickness</td>
+          <td><input class="inpL" id="ThkShl" type="number" value="24.0" min="0" step="any" onchange="updateAll();"></td>
+          <td class="lunit">inch</td></tr>
+      <tr><td>Add. Conc.</td>
+          <td><input class="inpL" id="AddCON" type="number" value="0.0" min="0" step="any" onchange="updateAll();"></td>
+          <td class="lunit">inch</td></tr>
+      <tr><td>Add. Iron</td>
+          <td><input class="inpL" id="AddFE" type="number" value="0.0" min="0" step="any" onchange="updateAll();"></td>
+          <td class="lunit">inch</td></tr>
+      <tr><td>Add. Lead</td>
+          <td><input class="inpL" id="AddPB" type="number" value="0.0" min="0" step="any" onchange="updateAll();"></td>
+          <td class="lunit">inch</td></tr>
+      <tr><td>Add. Other</td>
+          <td><input class="inpL" id="AddMIS" type="number" value="0.0" min="0" step="any" onchange="updateAll();"></td>
+          <td class="lunit">inch</td></tr>
+    </table>
+  </fieldset><br>
+  <table>
+    <tr><td>Fluence-to-Dose Method</td>
+        <td>
+          <select id="FTDSW" onchange="updateAll();">
+            <option value="0">Old</option>
+            <option value="1" selected="selected">Qiu-Mao</option>
+            <option value="2">Fasso</option>
+          </select></td></tr>
+  </table>
+</div>
+
+<div id='right_div'>
+<div id="drawing_div">
+  <div id="model_draw_div">
+    <img src="shield11.png">
+  </div>
+  <div id="dose_draw_div"></div>
+</div>
+
+<div id="dose">
+	Angle in degree, Dose in <label class="dunit">mrem/h</label>
+	<div id="wrapper">
+	<table id="dose_table">
+		<thead><tr><td>Angle</td>
+			<td>GRN</td>
+			<td>MID</td>
+			<td>HEN</td>
+			<td>GammaD</td>
+			<td>GammaI</td>
+			<td>Neutron</td>
+			<td>Photon</td>
+			<td>Total</td></tr></thead>
+		<tbody></tbody>
+	</table></div>
+  </div>
+</div>
+</div>
+
+<div id="footer">
+  <b>Reference:</b> W. R. Nelson and T, M. Jenkins, "The SHIELD11 Computer Code", <a href="http://www.slac.stanford.edu/cgi-wrap/getdoc/slac-r-737.pdf">SLAC-Report-737</a>, February 2005.<br>
+  <b>Ackowledgement:</b> <a href="http://dygraphs.com/">Dygraph</a> for plotting.<br>
+  <b>Bug Report:</b> xiaosj@slac.stanford.edu
+</div>
+
+</body>
+</html>

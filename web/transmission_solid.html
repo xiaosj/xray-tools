@@ -2,23 +2,38 @@
 <html>
 <head>
 <title>Transmission through Solid</title>
+<link rel="stylesheet" type="text/css" href="xray-tools.css">
+<link rel="stylesheet" href="dygraph.css">
 </head>
 
 <!-- <script src="//cdnjs.cloudflare.com/ajax/libs/dygraph/2.1.0/dygraph.min.js"></script> -->
 <script src="dygraph.min.js"></script>
 <script src="AtomicDensities_NIST5632.js"></script>
+<script src="CrossSec_NISTxaamdi.js"></script>
+<script src="utilities.js"></script>
 
-<script>
+<script type="text/javascript">
 var densities = AtomicDensities_NIST5632;
+var xSections = CrossSec_NISTxaamdi;
+var xType;
+var Emin, Emax;
+var default_Emin = 1.0;
+var default_Tmin = 1.0;
+var xsec;
+var xmin, xmax, nx;
+var xlist, ylist;
 
 // Validate element input
 function validateSymbol() {
-    Symbol = document.getElementById('symbol').value;
-    if(Symbol in densities) {
-        defaultDensity = densities[Symbol];
+    symbol = document.getElementById('symbol').value;
+    if(symbol in densities) {
+        defaultDensity = densities[symbol];
         document.getElementById('density').disabled = false;
         document.getElementById('default_density').innerHTML = defaultDensity;
-        setDensity();
+        xsec = xSections[symbol];
+        Emin = xsec[0][0];
+        var estep_num = xsec[0].length;
+        Emax = xsec[0][estep_num-1];
     } else {
         document.getElementById('density').disabled = true;
         document.getElementById('default_density').innerHTML = 'None';
@@ -30,23 +45,97 @@ function setDensity() {
     if(density < 0) {
         density = defaultDensity;
     }
-    drawIt();
 }
 
-function setThickness() {
-    drawIt();
+function chooseX(choice) {
+    xType = choice;
+    if(xType == 0) {
+        document.getElementById('fixed_label').innerHTML = 'Thickness';
+        document.getElementById('fixed_variable').defaultValue = 1.0;
+        document.getElementById('fixed_unit').innerHTML = 'mm';
+
+        document.getElementById('range_label').innerHTML = 'Energy';
+        document.getElementById('xmin').defaultValue = Emin;
+        if(Emax > 100){
+            document.getElementById('xmax').defaultValue = 100;
+        } else {
+            document.getElementById('xmax').defaultValue = Emax;
+        }
+        document.getElementById('range_unit').innerHTML = '(' + Emin + '-' + Emax + ') keV'
+        
+    } else {
+        document.getElementById('fixed_label').innerHTML = 'Energy';
+        document.getElementById('fixed_variable').defaultValue = Emin;
+        document.getElementById('fixed_unit').innerHTML = 'keV';
+
+        document.getElementById('range_label').innerHTML = 'Thickness';
+        document.getElementById('xmin').defaultValue = 1.0;
+        document.getElementById('xmax').defaultValue = 10.0;
+        document.getElementById('range_unit').innerHTML = 'mm'       
+    }
+    updateFixedVairiable();
+}
+
+function updateFixedVairiable() {
+}
+
+function updateX() {
+
 }
 
 // Draw the transmission curve
 function drawIt() {
+    var x_label, y_label;
+    if(xType == 0) {
+        x_label = 'Energy (keV)';
+    } else {
+        x_label = 'Thickness (mm)';
+    }
+    y_label = 'Transmission';
+    
+    var drawdata = [];
+    var ndata = xsec[0].length;
+    for(var i = 0; i < ndata; i++) {
+        drawdata.push([xsec[0][i], xsec[1][i]]);
+    }
 
+    var g = new Dygraph(document.getElementById('graphdiv'), drawdata,
+        {
+            xlabel: x_label,
+            axes: { x: { logscale: true} },
+            ylabel: y_label,
+            logscale: true
+        }
+    );
 }
 </script>
 
-<body onload="validateSymbol();">
-Element symbol: <input id="symbol" type="text" value="Fe" onchange="validateSymbol();"><br>
-Density: <input id="density" type="number" value="-1.0" onchange="setDensity();">
-(negative for default density: <label id="default_density"></label> g/cm3)<br>
-Thickness: <input id='thickness' type="number" value="1.0" min="0.0" onchange="setThickness();"> mm<br>
+<body onload="validateSymbol();chooseX(0);drawIt();">
+
+Element symbol: 
+<input id="symbol" type="text" value="Fe" size=15 onchange="validateSymbol();"><br>
+
+Density: <input id="density" type="number" value=-1.0 onchange="setDensity();">
+(negative for default density: <label id="default_density"></label> g/cm<sup>3</sup>)<br>
+
+Draw as function of: 
+<input type="radio" name="chooseX" checked="checked" onchange="chooseX(0);"> Energy
+<input type="radio" name="chooseX" onchange="chooseX(1);"> Thickness<br>
+
+<label id="fixed_label"></label>: 
+<input id='fixed_variable' type="number" onchange="updateFixedVairiable();">
+<label id="fixed_unit"></label><br>
+
+<label id='range_label'></label>: from 
+<input id='xmin' type="number" onchange="updateX();"> to 
+<input id='xmax' type="number" onchange="updateX();"> 
+<label id="range_unit"></label>, in 
+<input id='nx' type="number" value=100 onchange="updateX();"> steps<br>
+
+<br>
+<div id="graphdiv"></div>
+<br>
+
+<b>Ackowledgement:</b> <a href="http://dygraphs.com/">Dygraph</a> for plotting.
 </body>
 </html>

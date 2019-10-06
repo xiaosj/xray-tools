@@ -14,7 +14,7 @@ function linspace(start, end, step_num=100) {
 }
 
 // Generate a log-evenly spaced list, inclusive 
-function linspace(start, end, step_num=100) {
+function logspace(start, end, step_num=100) {
     if(step_num > 2 && start > 0 && end > 0) {
         var log_start = Math.log(start);
         var log_end = Math.log(end);
@@ -50,8 +50,9 @@ function loglininterp(x1, x2, y1, y2, x0) {
 // Interpolate from x / y list
 function interp1d(x, y, x0, logx = false, logy = false) {
     var n = x.length;
+    var reslut;
     if(x0 < x[0] || x0 > x[n-1]) {
-        return NaN;
+        reslut = NaN;
     } else {
         // Find index
         var idx = Math.floor(n / 2);
@@ -73,16 +74,17 @@ function interp1d(x, y, x0, logx = false, logy = false) {
         var y1 = y[idx], y2 = y[idx + 1];
         if(!logx) {
             if(!logy) {
-                lininterp(x1, y1, x2, y2, x0);
+                reslut = lininterp(x1, x2, y1, y2, x0);
             } else {
-                linloginterp(x1, y1, x2, y2, x0);
+                reslut = linloginterp(x1, x2, y1, y2, x0);
             }
         } else {
             if(!logy) {
-                loglininterp(x1, y1, x2, y2, x0);
+                reslut = loglininterp(x1, x2, y1, y2, x0);
             } else {
-                loginterp(x1, y1, x2, y2, x0);
+                reslut = loginterp(x1, x2, y1, y2, x0);
             }
         }
     }
+    return reslut;
 }

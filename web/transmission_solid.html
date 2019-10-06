@@ -8,18 +8,19 @@
 
 <!-- <script src="//cdnjs.cloudflare.com/ajax/libs/dygraph/2.1.0/dygraph.min.js"></script> -->
 <script src="dygraph.min.js"></script>
-<script src="AtomicDensities_NIST5632.js"></script>
+<script src="Standard_Densities.js"></script>
 <script src="CrossSec_NISTxaamdi.js"></script>
 <script src="utilities.js"></script>
 
 <script type="text/javascript">
-var densities = AtomicDensities_NIST5632;
+var densities = Standard_Densities;
 var xSections = CrossSec_NISTxaamdi;
 var xType;
 var Emin, Emax;
 var default_Emin = 1.0;
 var default_Tmin = 1.0;
 var xsec;
+var density;
 var xmin, xmax, nx;
 var xlist, ylist;
 var graph;
@@ -101,16 +102,38 @@ function drawIt() {
     }
     y_label = 'Transmission';
     
+    // Generate draw data
+    xmin = document.getElementById('xmin').value;
+    xmax = document.getElementById('xmax').value;
+    nx = Math.floor(document.getElementById('nx').value);
+    var logx = document.getElementById('logx').checked;
+    if(logx) {
+        xlist = logspace(xmin, xmax, nx);
+    } else {
+        xlist = linspace(xmin, xmax, nx);
+    }
+    ylist = [];
+    density = densities[symbol];
+    if(xType == 0) {
+        var thickness = document.getElementById('fixed_variable').value * 0.1;  // mm to cm
+        for(var i = 0; i < nx; i++) {
+            var miu = interp1d(xsec[0], xsec[1], xlist[i], logx=true, logy=true);
+            ylist.push(Math.exp(-miu * density * thickness));
+        }
+    } else {
+
+    }
+    
     var drawdata = [];
-    var ndata = xsec[0].length;
-    for(var i = 0; i < ndata; i++) {
-        drawdata.push([xsec[0][i], xsec[1][i]]);
+    for(var i = 0; i < nx; i++) {
+        drawdata.push([xlist[i], ylist[i]]);
     }
 
     graph = new Dygraph(document.getElementById('graphdiv'), drawdata,
         {
             xlabel: x_label,
-            ylabel: y_label
+            ylabel: y_label,
+            valueRange: [1e-8, null]
         }
     );
     setLogScale();
@@ -120,9 +143,9 @@ function drawIt() {
 <body onload="validateSymbol();chooseX(0);drawIt();">
 
 Element symbol: 
-<input id="symbol" type="text" value="Fe" size=15 onchange="validateSymbol();"><br>
+<input id="symbol" type="text" value="Fe" size=15 onchange="validateSymbol();drawIt();"><br>
 
-Density: <input id="density" type="number" value=-1.0 onchange="setDensity();">
+Density: <input id="density" type="number" value=-1.0 onchange="setDensity();drawIt();">
 (negative for default density: <label id="default_density"></label> g/cm<sup>3</sup>)<br>
 
 Draw as function of: 
@@ -130,14 +153,14 @@ Draw as function of:
 <input type="radio" name="chooseX" onchange="chooseX(1);"> Thickness<br>
 
 <label id="fixed_label"></label>: 
-<input id='fixed_variable' type="number" onchange="updateFixedVairiable();">
+<input id='fixed_variable' type="number" onchange="updateFixedVairiable();drawIt();">
 <label id="fixed_unit"></label><br>
 
 <label id='range_label'></label>: from 
-<input id='xmin' type="number" onchange="updateX();"> to 
-<input id='xmax' type="number" onchange="updateX();"> 
+<input id='xmin' type="number" onchange="updateX();drawIt();"> to 
+<input id='xmax' type="number" onchange="updateX();drawIt();"> 
 <label id="range_unit"></label>, in 
-<input id='nx' type="number" value=100 onchange="updateX();"> steps<br>
+<input id='nx' type="number" value=100 onchange="updateX();drawIt();"> steps<br>
 
 <br>
 <input id="logx" type="checkbox" checked=true onchange="setLogScale();"> log X

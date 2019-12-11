@@ -10,9 +10,10 @@ import xraylib
 
 def goodID(matID, item=None):
     """ Check if the material ID is defined:
-        item = None,    in xraylib;
-             'density', in density dictionary;
-             'Cp',      in heat capacity dictionary.
+        item = None,    in xraylib
+             'density', in density dictionary
+             'Cp',      in heat capacity dictionary
+             'crystal', in crystal dictionary
     """
     good = True
     id = matID
@@ -23,6 +24,13 @@ def goodID(matID, item=None):
     if item == 'Cp':
         if matID not in specificHeatParams:
             print('Cannot find the specific heat parameters of ' + matID)
+            good = False
+    if item == 'crystal':
+        if matID not in latticeType:
+            print('Cannot find the lattice type of ' + matID)
+            good = False
+        if matID not in latticeParameters:
+            print('Cannot find the lattice parameters of ' + matID)
             good = False
     else:
         if matID in alias:
@@ -37,9 +45,59 @@ def goodID(matID, item=None):
             good = False
    
     if not good:
-        raise Exception('STOP: Wrong material!')
+        raise Exception('STOP: Missing material properties.')
 
     return id
+
+
+def lam(E,o=0):
+    """ Computes photon wavelength in m
+        E is photon energy in eV or keV
+        set o to 0 if working at sub-100 eV energies
+    """
+    if o:
+      E=E
+    else:
+      E=eV(E)
+    lam=(12398.4/E)*1e-10
+    return (12398.4/E)*1e-10
+
+
+def sind(A):
+    """ Sin of an angle specified in degrees """
+    Arad = np.deg2rad(A)
+    x = np.sin(Arad) 
+    return x
+ 
+def cosd(A):
+    """ Cos of an angle specified in degrees """
+    Arad = np.deg2rad(A)
+    x = np.cos(Arad) 
+    return x
+
+def tand(A):
+    """ Tan of an angle specified in degrees """
+    Arad = np.deg2rad(A)
+    x = np.tan(Arad) 
+    return x
+ 
+def asind(x):
+    """ Arcsin in degrees """
+    A = np.arcsin(x)
+    A = np.rad2deg(A) 
+    return A
+ 
+def acosd(x):
+    """ Arccos in degrees """
+    A = np.arccos(x)
+    A = np.rad2deg(A) 
+    return A
+
+def atand(x):
+    """ Arctan in degrees """
+    A = np.arctan(x)
+    A = np.rad2deg(A) 
+    return A
 
 
 def defaultDensity(matID):
@@ -389,6 +447,181 @@ def C2K(degC):
 def K2C(degK):
     ''' Convert Kelvin to Celsius '''
     return degK - 273.15
+
+
+def dSpace(ID,hkl):
+    """ Computes the d spacing (m) of the specified material and reflection 
+        ID is chemical fomula : 'Si'
+        hkl is the reflection : (1,1,1)
+    """
+    ID = goodID(ID)
+    h=hkl[0]
+    k=hkl[1]
+    l=hkl[2]
+
+    lp=latticeParameters[ID]
+    a=lp[0]/u['ang']
+    b=lp[1]/u['ang']
+    c=lp[2]/u['ang']
+    alpha=lp[3]
+    beta=lp[4]
+    gamma=lp[5]
+
+    ca=cosd(alpha)
+    cb=cosd(beta)
+    cg=cosd(gamma)
+    sa=sind(alpha)
+    sb=sind(beta)
+    sg=sind(gamma)
+
+    invdsqr=1/(1+2*ca*cb*cg-ca**2-cb**2-cg**2)*(h**2*sa**2/a**2 + k**2*sb**2/b**2 + l**2*sg**2/c**2 +
+      2*h*k*(ca*cb-cg)/a/b+2*k*l*(cb*cg-ca)/b/c+2*h*l*(ca*cg-cb)/a/c)
+      
+    d=invdsqr**-0.5
+    return d
+
+
+def BraggAngle(ID,hkl,E=None):
+    """ Computes the Bragg angle (deg) of the specified material, reflection and photon energy 
+        ID is chemical fomula : 'Si'
+        hkl is the reflection : (1,1,1)
+        E is photon energy in eV or keV (default is LCLS value)
+    """
+    ID=goodID(ID)
+    E = getE(E)
+    d=dSpace(ID,hkl)
+    theta = asind(lam(E)/2/d)
+    return theta
+
+
+def BraggEnergy(ID,hkl,twotheta):
+    """ Computes the photon energy that satisfies the Bragg condition of the specified material, reflection and twotheta angle 
+        ID is chemical fomula : 'Si'
+        hkl is the reflection : (1,1,1)
+        twotheta is the scattering angle in degrees
+    """
+    ID=checkID(ID)
+    d=dSpace(ID,hkl)
+    l=2*d*sind(twotheta/2.0)
+    E=lam2E(l)
+    return E
+
+def StructureFactor(ID,f,hkl,z=None):
+    """ Computes the structure factor
+        ID is chemical fomula : 'Si'
+        f is the atomic form factor
+        hkl is the reflection : (1,1,1)
+        z is the rhombohedral lattice parameter
+    """
+    ID=checkID(ID)
+    i=complex(0,1)
+    h=hkl[0]
+    k=hkl[1]
+    l=hkl[2]
+    L=latticeType[ID]
+    if L=='fcc':
+      F=f*(1+n.exp(-i*n.pi*(k+l))+n.exp(-i*n.pi*(h+l))+n.exp(-i*n.pi*(h+k)))
+    elif L=='bcc':
+      F=f*(1+n.exp(-i*n.pi*(h+k+l)))  
+    elif L=='cubic':
+        F=f;
+    elif L=='diamond':
+        F=f*(1+n.exp(-i*n.pi*(k+l))+n.exp(-i*n.pi*(h+l))+n.exp(-i*n.pi*(h+k)))*(1+n.exp(-i*2*n.pi*(h/4.0+k/4.0+l/4.0)))
+    elif L=='rhomb':
+        z=latticeParamRhomb[ID]
+        F=f*(1+n.exp(2*i*n.pi*(h+k+l)*z)) 
+    elif L=='tetr':
+        F=f;
+    elif L=='hcp':
+        F=f*(1+n.exp(2*i*n.pi*(h/3.0+2*k/3.0+l/2.0)))
+    return F
+
+def StructureFactorE(ID,hkl,E=None,z=None):
+    ID=checkID(ID)
+    E = getE(E)
+    theta=BraggAngle(ID,hkl,E)
+    f=FF(ID,2*theta,E)
+    return StructureFactor(ID,f,hkl,z)
+    
+def UnitCellVolume(ID):
+    """ Returns the unit cell volume in m^3
+        ID is chemical fomula : 'Si'
+    """   
+    ID=checkID(ID)
+    lp=latticeParameters[ID]
+    a=lp[0]/u['ang']
+    b=lp[1]/u['ang']
+    c=lp[2]/u['ang']
+    alpha=lp[3]
+    beta=lp[4]
+    gamma=lp[5]
+    L=latticeType[ID]
+    ca=cosd(alpha)
+    cb=cosd(beta)
+    cg=cosd(gamma)
+    V=a*b*c*n.sqrt(1-ca**2-cb**2-cg**2+2*ca*cb*cg)
+    return V
+
+def DebyeWallerFactor(ID,hkl,T=293,E=None):
+    """ Computes the Debye Waller factor for a specified reflection
+        ID is chemical fomula : 'Si'
+        T is the crystal temperature in Kelvin (default is 293)
+        E is photon energy in eV or keV (default is LCLS value)
+    """
+    ID=checkID(ID)
+    E = getE(E)
+    theta=BraggAngle(ID,hkl,E)
+    l=lam(E)*u['ang']
+    T_Debye=debyeTemp[ID]
+    mass=MolecularMass(ID)
+    y=lambda x: x/(n.exp(x)-1)
+    ratio=T_Debye/float(T)
+    intgrl,err=s.integrate.quad(y,1e-9,ratio)
+    phi=intgrl*T/T_Debye    
+    B=11492*T*phi/(mass*T_Debye**2)+2873/(mass*T_Debye)
+    M=B*(sind(theta)/l)**2
+    DWfactor=n.exp(-M)
+    return DWfactor
+
+
+def DarwinWidth(ID,hkl,E=None,T=293):
+    """ Computes the Darwin width for a specified crystal reflection (degrees)
+        ID is chemical fomula : 'Si'
+        hkl is the reflection : (1,1,1)
+        E is photon energy in eV or keV
+        T is the crystal temperature in Kelvin (default is 293)
+    """
+    ID = goodID(ID)
+    E = getE_keV(E)
+    theta = BraggAngle(ID,hkl,E)
+    l = lam(E)
+    f = FF(ID,2*theta,E)
+    F = StructureFactor(ID,f,hkl)
+    V = UnitCellVolume(ID)
+    dw=(2*c['eRad']*l**2*np.abs(F))/(n.pi*V*sind(2*theta))/u['rad']
+    return dw
+
+
+def DarwinWidthE(ID,hkl,E=None,T=293):
+    """ Computes the delta E corresponding to the Darwin width for a specified crystal reflection (degrees)
+        ID is chemical fomula : 'Si'
+        hkl is the reflection : (1,1,1)
+        E is photon energy in eV or keV (default is LCLS value)
+        T is the crystal temperature in Kelvin (default is 293)
+    """
+    dw       = DarwinWidth(ID,hkl,E,T)
+    theta    = BraggAngle(ID,hkl,E)
+    DeltaEoE = 1/tand(theta)*dw*u['rad']
+    DeltaE   = DeltaEoE*E
+    return DeltaE
+
+
+def DeltaEoE(ID,hkl,E=None,T=293):
+    ID=checkID(ID)
+    E = getE(E)
+    theta=BraggAngle(ID,hkl,E)
+    dw=DarwinWidth(ID,hkl,E,T)
+    return 1/tand(theta)*dw*u['rad']
 
 
 """ Define units and constants
@@ -1431,7 +1664,8 @@ latticeType = {'H' :'hcp',
 # Crystal Lattice parameters (a, b, c, alpha, beta, gamma)
 # a,b,c in angstroms
 # alpha, beta, gamma in degrees
-latticeParameters = {'H' :(3.75,3.75,6.12,90,90,120),
+latticeParameters = {
+     'H' :(3.75,3.75,6.12,90,90,120),
      'He':(3.57,3.57,5.83,90,90,120),
      'Li':(3.491,3.491,3.491,90,90,90),
      'Be':(2.2866,2.2866,3.5833,90,90,120),

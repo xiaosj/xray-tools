@@ -439,6 +439,49 @@ def spectrum_shield(spectrum, area_cm2, matID, density=None, eVrange=(0.0,0.0), 
     return t1
 
 
+def plot(x, y, xlabel=None, ylabel=None, title=None, figsize=(4,3), logx=False, logy=False, xmin=None, xmax=None, ymin=None, ymax=None, savefig=None):
+    ''' Plot function
+    '''
+    plt.figure(figsize=figsize, dpi=100, facecolor='white')
+    
+    if not logx and not logy:   plt.plot(x, y)
+    if not logx and logy:       plt.semilogy(x, y)
+    if logx and not logy:       plt.semilogx(x, y)
+    if logx and logy:           plt.loglog(x, y)
+
+    if xmin is not None:
+        plt.xlim(left=xmin)
+    else:
+        plt.xlim(left=x[0])
+    
+    if xmax is not None:
+        plt.xlim(right=xmax)
+    else:
+        plt.xlim(right=x[-1])
+
+    if ymin is not None:
+        plt.ylim(bottom=ymin)
+    else:
+        if not logy:  plt.ylim(bottom=0)
+
+    if ymax is not None:
+        plt.ylim(top=ymax)
+
+    if title is not None:  plt.title(title, fontsize=11)
+    if xlabel is not None: plt.xlabel(xlabel)
+    if ylabel is not None: plt.ylabel(ylabel)
+
+    plt.grid(True)
+    plt.tight_layout()
+
+    if savefig is not None:
+        if savefig[-4:] != '.png':
+            savefig = savefig + '.png'
+        plt.savefig(savefig)
+
+    plt.show()
+
+
 def C2K(degC):
     ''' Convert Celsius to Kelvin '''
     return degC + 273.15

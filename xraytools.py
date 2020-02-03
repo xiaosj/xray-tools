@@ -128,7 +128,7 @@ def molarMass(matID):
 
 
 def mu(matID, keV, density=None):
-    """ Calculate the attenuation coefficients (1/m) at given energies
+    """ Calculate the mass attenuation coefficients (1/m) at given energies
           keV: energy in keV (vectorized)
           density in g/cm3, None=default density
     """
@@ -140,6 +140,25 @@ def mu(matID, keV, density=None):
     else:
         energies = np.array(keV, dtype=np.double)
     _mu = np.array([xraylib.CS_Total_CP(mat, eng) * density * u['cm'] for eng in energies])
+    if np.isscalar(keV):
+        return np.asscalar(_mu)
+    else:
+        return _mu
+
+
+def mu_en(matID, keV, density=None):
+    """ Calculate the mass energy-absorption coefficients (1/m) at given energies
+          keV: energy in keV (vectorized)
+          density in g/cm3, None=default density
+    """
+    mat = goodID(matID)
+    if density == None:
+        density = defaultDensity(matID)
+    if np.isscalar(keV):
+        energies = np.array([keV], dtype=np.double)
+    else:
+        energies = np.array(keV, dtype=np.double)
+    _mu = np.array([xraylib.CS_Energy_CP(mat, eng) * density * u['cm'] for eng in energies])
     if np.isscalar(keV):
         return np.asscalar(_mu)
     else:

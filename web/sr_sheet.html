@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>SR Calculators</title>
+
+<style></style>
+
+</head>
+<!-- <script src="bessel.js"></script> -->
+<script src="sr_calc.js"></script>
+
+<body onload="init();">
+  <b>Electron Beam Parameters</b><br>
+  Energy: <input type="number" id="e_energy" value="10" min="0" step="0.01" style="width: 4em" onchange="changeEnergy();"> GeV<br>
+  <br>
+  <b>Bending Magnet</b><br>
+  <table>
+    <tr>
+      <td>Magnetic Field: </td>
+      <td><input type="number" id="bend_B" value="1.25" min="0" step="0.001" style="width: 5em" onchange="changeBendB();"> T</td>
+    </tr>
+    <tr>
+      <td>Critical Energy: </td>
+      <td><input type="number" id="bend_CE" style="width: 5em" readonly> keV</td>
+    </tr>
+  </table>
+  <br>
+  <b>Undulator</b><br>
+  <table>
+    <tr>
+      <td>Undulator Period: </td>
+      <td><input type="number" id="period_mm" value="26" min="0" step="0.1" style="width: 5em" onchange="changePeriod();">
+         mm (<i>LCLS HXR 26 mm, SXR 39 mm</i>)</td>
+    </tr>
+    <tr>
+      <td>Magnetic Field: </td>
+      <td><input type="number" id="und_B" min="0" step="0.001" style="width: 5em" onchange="changeUndB();"> T</td>
+    </tr>
+    <tr>
+      <td>Strengh Parameter K: </td>
+      <td><input type="number" id="K" value="2.44" min="0" step="0.001" style="width: 5em" onchange="changeK();"></td>
+    </tr>
+    <tr>
+      <td>Fundamental Energy: </td>
+      <td><input type="number" id="fundamental_energy" style="width: 5em" readonly> keV (
+          <input type="number" id="fundamental_wavelength" style="width: 5em" readonly> nm)</td>
+    </tr>
+    <tr>
+      <td>Total SR Power: </td>
+      <td><input type="number" id="und_total_sr_power" style="width: 5em" readonly> W/mA/m (<i>1mA beam & 1m long undulator</i>)</td>
+
+    </tr>
+  </table>
+</body>
+</html>

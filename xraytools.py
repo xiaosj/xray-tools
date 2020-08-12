@@ -198,6 +198,22 @@ def eVatom(matID, keV, mJ, rms_mm, density=None):
     return EdensityJcm3 * atomVolcm3 / 1.6e-19
 
 
+def eVatom_en(matID, keV, mJ, rms_mm, density=None):
+    """ Calculate the eV/atom at given energies with mu_en
+          keV: energies in keV (vectorized)
+          mJ: pulse energy in mJ (vectorized)
+          rms_mm: beam size radius in mm (vectorized)
+             -- E, mJ, rms_mm must match if more than one are vectorized
+          density: in g/cm3, None=default density
+    """
+    if density == None:
+        density = defaultDensity(matID)
+    attL = 1.0 / mu_en(matID, keV, density)
+    EdensityJcm3 = mJ/1000 / (2 * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
+    atomVolcm3 = atomWeight(matID) / c['NA'] / density
+    return EdensityJcm3 * atomVolcm3 / 1.6e-19
+
+
 def eVatom_keV_plot(matID, keV, mJ, rms_mm, density=None, logx=False, logy=True):
     if not isinstance(matID, list):
         matID = [matID]

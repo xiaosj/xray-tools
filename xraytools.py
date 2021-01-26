@@ -23,8 +23,8 @@ def goodID(matID, item=None):
             print('Cannot find the density of ' + matID)
             good = False
     if item == 'Cp':
-        if matID not in specificHeatParams:
-            print('Cannot find the specific heat parameters of ' + matID)
+        if matID not in specificHeatParams and matID not in specificHeat:
+            print('Cannot find the specific heat of ' + matID)
             good = False
     if item == 'crystal':
         if matID not in latticeType:
@@ -290,37 +290,44 @@ def pulseT(matID, keV, mJ, rms_mm, density=None, baseT=298.15):
 
     # build temperature as a fuction of J/cm3
     goodID(matID, 'Cp')
-    CpParam = specificHeatParams[matID]
-    if type(CpParam) is tuple:
-        CpParam = [[baseT, meltPoint[matID], CpParam]]
+    if matID in specificHeatParams:
+        CpParam = specificHeatParams[matID]
+        if type(CpParam) is tuple:
+            CpParam = [[baseT, meltPoint[matID], CpParam]]
 
-    if baseT < CpParam[0][0]:
-        CpParam[0][0] = baseT
-    if baseT > CpParam[-1][1]:
-        raise Exception('Base temperature cannot be higher than the melting point of {:s} ({:d} K)'.format(matID, int(CpParam[-1][1])))
-    nzone = len(CpParam)
-    for i in range(nzone):
-        if baseT >= CpParam[0][0] and baseT <= CpParam[0][1]:
+        if baseT < CpParam[0][0]:
             CpParam[0][0] = baseT
-            break
-        else:
-            del CpParam[0]
-    
-    dT = 10
-    T = np.array([])
-    Jmol = np.array([])
-    J0 = 0
-    for i in range(len(CpParam)):
-        Ti = np.arange(CpParam[i][0], CpParam[i][1], dT)
-        Ji = intCp2(CpParam[i][0], Ti, CpParam[i][2]) + J0
-        T = np.concatenate((T, Ti))
-        Jmol = np.concatenate((Jmol, Ji))
-        if i < len(CpParam) - 1:
-            J0 = intCp2(CpParam[i][0], CpParam[i+1][0], CpParam[i][2])
+        if baseT > CpParam[-1][1]:
+            raise Exception('Base temperature cannot be higher than the melting point of {:s} ({:d} K)'.format(matID, int(CpParam[-1][1])))
+        nzone = len(CpParam)
+        for i in range(nzone):
+            if baseT >= CpParam[0][0] and baseT <= CpParam[0][1]:
+                CpParam[0][0] = baseT
+                break
+            else:
+                del CpParam[0]
+        
+        dT = 10
+        T = np.array([])
+        Jmol = np.array([])
+        J0 = 0
+        for i in range(len(CpParam)):
+            Ti = np.arange(CpParam[i][0], CpParam[i][1], dT)
+            Ji = intCp2(CpParam[i][0], Ti, CpParam[i][2]) + J0
+            T = np.concatenate((T, Ti))
+            Jmol = np.concatenate((Jmol, Ji))
+            if i < len(CpParam) - 1:
+                J0 = intCp2(CpParam[i][0], CpParam[i+1][0], CpParam[i][2])
+        Jmol_base = 0.0
+
+    else:  # use itegrated specific heat directly
+        T = specificHeat[matID][0]
+        Jmol = specificHeat[matID][2]
+        Jmol_base = interp1d(T, Jmol)(baseT) 
 
     T_Jmol = interp1d(Jmol, T, fill_value='extrapolate')  # T as function of J/mol
 
-    return T_Jmol(EdensityJmol)
+    return T_Jmol(EdensityJmol + Jmol_base)
 
 
 def pulseTC(matID, keV, mJ, rms_mm, density=None, baseT=25):
@@ -847,6 +854,11 @@ def Reflectivity_coated(E, theta, sub_mat, coat_mat, coat_thickness, f1f2data='d
     if scalar_E:
         return np.squeeze(R)
     return R
+
+
+def mirror_defocus_ratio(src, mirror, focus, target):
+    div_ratio = (mirror - src) / (focus - mirror)
+    return np.abs(target - focus) / (target - src) * div_ratio
 
 
 """ Define units and constants
@@ -1989,8 +2001,6 @@ specificHeatParams = {
     'Li':(169.552,-882.711,1977.438,-1487.312,-1.609635),
     'Be':(21.20694,5.68819,0.968019,-0.001749,-0.587526),
      'B':(10.18574,29.24415,-18.02137,4.212326,-0.551),
-     'C':(6.37,0,0,0,0),
-   'CVD':(6.37,0,0,0,0),
     'Na':(72.63675,-9.491572,-730.9322,1414.518,-1.259377),
     'Mg':(26.54083,-1.533048,8.062443,0.57217,-0.174221),
     'Al':(28.0892,-5.414849,8.560423,3.42737,-0.277375),
@@ -2054,6 +2064,15 @@ specificHeatParams = {
     'LaAlO3':(86.6,0,0,0,0),
     'LaMnO3':(89,0,0,0,0),
     'La0.5Ca0.5MnO3':(89,0,0,0,0)
+}
+
+# List of specific heat
+#  [K, J/mol/K, Integrated J/mol]
+specificHeat = {
+    'CVD': np.array([[50, 100, 150, 200, 250, 298, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000],
+                     [0.052335, 0.20850264, 1.00022652, 2.3801958, 4.15456164, 6.07797756, 6.16045752, 8.21575764, 10.17643608, 11.96252496, 13.544298, 14.92217388, 16.11206244, 17.1365724, 18.01831248, 18.77821668, 19.43470692, 20.00411172, 20.50024752, 20.93358132, 21.31416144, 21.6499428, 22.44627216, 22.8452742, 23.1697512, 23.43603168, 23.6575134, 23.99999364, 24.24952692, 24.43667688, 24.58028412, 24.69290904, 24.78292524, 24.82521192],
+                     [0.00, 6.52, 36.74, 121.25, 284.62, 530.20, 542.44, 901.84, 1361.65, 1915.12, 2552.79, 3264.45, 4040.31, 4871.53, 5750.40, 6670.31, 7625.63, 8611.61, 9624.21, 10660.06, 11716.25, 13864.46, 16069.27, 18333.85, 20634.60, 22964.89, 25319.56, 30085.32, 34910.27, 39778.89, 44680.58, 49607.90, 54555.49, 59516.30]
+                    ])
 }
 
 # Latent heat in kJ/mol

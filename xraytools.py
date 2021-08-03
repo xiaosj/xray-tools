@@ -266,6 +266,47 @@ def eVatom_keV_plot(matID, keV, mJ, rms_mm, density=None, logx=False, logy=True)
         plt.show()
 
 
+def drillSpeed(matID, W, FWHM_mm):
+    """ Return the material drill speed (mm/s) based on vaporization heat """
+    vaporH = {  # kJ/mol
+        'Cu':  29.7 + 13.1 + 48.8 + 300,
+        'Fe':  49.5 + 13.8 + 60.9 + 340,
+        'W' : 118.4 + 46.9 + 82.5 + 824,
+        'Mo':  89.9 + 37.5 + 71.9 + 598,
+        'Al': 17.98 + 10.7 + 0.03175*1857 + 294
+    }
+    if matID not in vaporH.keys():
+        raise ValueError(f'No vaporization data for {matID}: available in {vaporH.keys()}')
+    
+    mol_mmD = np.pi * (FWHM_mm/2)**2 / 1000 * defaultDensity(matID) / molarMass(matID)
+    return W / (mol_mmD * vaporH[matID] * 1000)
+
+
+def drillTime(matID, thickness_mm, W, FWHM_mm):
+    """ Return the material drill time based on vaporization heat """
+    return thickness_mm / drillSpeed(matID, W, FWHM_mm)
+
+
+def getCp(matID, T):
+    goodID(matID, 'Cp')
+    if matID in specificHeatParams:
+        TT = T / 1000
+        A = specificHeatParams[matID]
+        return A[0] + A[1] * TT + A[2] * TT**2 + A[3] * TT**3 + A[4] / TT**2
+    else:
+        raise Exception(f'No heat capacity data for {matID}')
+
+def getIntCp(matID, T1_K, T2_K):
+    """ Get integrated heat capacity in J/mol
+        * T1, T2 in K
+    """
+    goodID(matID, 'Cp')
+    if matID in specificHeatParams:
+        A = specificHeatParams[matID]
+        return intCp2(T1_K, T2_K, A)
+    else:
+        raise Exception(f'Wrong material {matID}: Only support materials within specificHeatParams.')
+
 def intCp(T, A):
     TT = T / 1000
     return 1000 * (A[0] * TT + A[1]/2 * TT**2 + A[2]/3 * TT**3 + A[3]/4 * TT**4 - A[4] / TT)
@@ -363,9 +404,9 @@ def spectrum_eV_power_mW(spectrum, eVrange=(0.0,0.0)):
     spec = spectrum_cut(spectrum, eVrange)
     eV = spec[:,0]
     flux = spec[:,1]
-    nW_bin = [(flux[i]+flux[i+1]) / 2 * (eV[i+1]-eV[i]) * (eV[i+1]+eV[i]) / 2 * 1.6e-10
+    W_bin = [(flux[i]+flux[i+1]) / 2 * (eV[i+1]-eV[i]) * (eV[i+1]+eV[i]) / 2 * c['e']
               for i in range(len(eV)-1)]
-    return np.sum(nW_bin)*1.e-6
+    return np.sum(W_bin) * 1000
 
 
 def spectrum_eV_flux(spectrum, eVrange=(0.0,0.0)):
@@ -394,7 +435,7 @@ def spectrum_power_mW(spectrum, eVrange=(0.0,0.0), specType='bw'):
         return spectrum_eV_power_mW(spec, eVrange)
 
 
-def spectrum_dose(spectrum, area_cm2, eVrange=(0.0,0.0), specType='eV', particle='photon'):
+def spectrum_dose(spectrum, area_cm2, eVrange=(0.0,0.0), specType='bw', particle='photon'):
     """
        spectrum: [eV, flux]
        area_cm2: area of spot
@@ -424,7 +465,7 @@ def spectrum_dose(spectrum, area_cm2, eVrange=(0.0,0.0), specType='eV', particle
     return np.sum(dose_bin) / area_cm2
     
 
-def spectrum_shield(spectrum, area_cm2, matID, density=None, eVrange=(0.0,0.0), specType='eV',
+def spectrum_shield(spectrum, area_cm2, matID, density=None, eVrange=(0.0,0.0), specType='bw',
                     dose_limit=0.05, dt_limit=0.01, particle='photon', verbose=0):
     """
     Retrun required shielidng in mm
@@ -437,7 +478,7 @@ def spectrum_shield(spectrum, area_cm2, matID, density=None, eVrange=(0.0,0.0), 
        dose_limit: shielding goal, 0.05 mrem/h by default
        dt_limit:   smallest shielding thickness step
        particle:   type of particle
-       verbose:    output details if > 1
+       verbose:    output details if > 0
     """
     spec = spectrum_cut(spectrum, eVrange)
     al = np.array([attenuationLength(matID, eV/1000, density=density) for eV in spec[:,0]]) * 1000
@@ -482,7 +523,7 @@ def spectrum_shield(spectrum, area_cm2, matID, density=None, eVrange=(0.0,0.0), 
     return t1
 
 
-def plot(x, y, xlabel=None, ylabel=None, title=None, figsize=(4,3), logx=False, logy=False, xmin=None, xmax=None, ymin=None, ymax=None, savefig=None):
+def plot(x, y, xlabel=None, ylabel=None, title=None, figsize=(4,2.8), logx=False, logy=False, xmin=None, xmax=None, ymin=None, ymax=None, savefig=None):
     ''' Plot function
     '''
     plt.figure(figsize=figsize, dpi=100, facecolor='white')
@@ -574,7 +615,7 @@ def BraggAngle(ID,hkl,E=None):
         E is photon energy in eV or keV (default is LCLS value)
     """
     ID=goodID(ID)
-    E = getE(E)
+    # E = getE(E)
     d=dSpace(ID,hkl)
     theta = asind(lam(E)/2/d)
     return theta
@@ -586,7 +627,7 @@ def BraggEnergy(ID,hkl,twotheta):
         hkl is the reflection : (1,1,1)
         twotheta is the scattering angle in degrees
     """
-    ID=checkID(ID)
+    ID=goodID(ID)
     d=dSpace(ID,hkl)
     l=2*d*sind(twotheta/2.0)
     E=lam2E(l)
@@ -599,32 +640,32 @@ def StructureFactor(ID,f,hkl,z=None):
         hkl is the reflection : (1,1,1)
         z is the rhombohedral lattice parameter
     """
-    ID=checkID(ID)
+    ID=goodID(ID)
     i=complex(0,1)
     h=hkl[0]
     k=hkl[1]
     l=hkl[2]
     L=latticeType[ID]
     if L=='fcc':
-      F=f*(1+n.exp(-i*n.pi*(k+l))+n.exp(-i*n.pi*(h+l))+n.exp(-i*n.pi*(h+k)))
+      F=f*(1+np.exp(-i*np.pi*(k+l))+np.exp(-i*np.pi*(h+l))+np.exp(-i*np.pi*(h+k)))
     elif L=='bcc':
-      F=f*(1+n.exp(-i*n.pi*(h+k+l)))  
+      F=f*(1+np.exp(-i*np.pi*(h+k+l)))  
     elif L=='cubic':
-        F=f;
+        F=f
     elif L=='diamond':
-        F=f*(1+n.exp(-i*n.pi*(k+l))+n.exp(-i*n.pi*(h+l))+n.exp(-i*n.pi*(h+k)))*(1+n.exp(-i*2*n.pi*(h/4.0+k/4.0+l/4.0)))
+        F=f*(1+np.exp(-i*np.pi*(k+l))+np.exp(-i*np.pi*(h+l))+np.exp(-i*np.pi*(h+k)))*(1+np.exp(-i*2*np.pi*(h/4.0+k/4.0+l/4.0)))
     elif L=='rhomb':
         z=latticeParamRhomb[ID]
-        F=f*(1+n.exp(2*i*n.pi*(h+k+l)*z)) 
+        F=f*(1+np.exp(2*i*np.pi*(h+k+l)*z)) 
     elif L=='tetr':
-        F=f;
+        F=f
     elif L=='hcp':
-        F=f*(1+n.exp(2*i*n.pi*(h/3.0+2*k/3.0+l/2.0)))
+        F=f*(1+np.exp(2*i*np.pi*(h/3.0+2*k/3.0+l/2.0)))
     return F
 
 def StructureFactorE(ID,hkl,E=None,z=None):
-    ID=checkID(ID)
-    E = getE(E)
+    ID=goodID(ID)
+    # E = getE(E)
     theta=BraggAngle(ID,hkl,E)
     f=FF(ID,2*theta,E)
     return StructureFactor(ID,f,hkl,z)
@@ -633,7 +674,7 @@ def UnitCellVolume(ID):
     """ Returns the unit cell volume in m^3
         ID is chemical fomula : 'Si'
     """   
-    ID=checkID(ID)
+    ID=goodID(ID)
     lp=latticeParameters[ID]
     a=lp[0]/u['ang']
     b=lp[1]/u['ang']
@@ -645,7 +686,7 @@ def UnitCellVolume(ID):
     ca=cosd(alpha)
     cb=cosd(beta)
     cg=cosd(gamma)
-    V=a*b*c*n.sqrt(1-ca**2-cb**2-cg**2+2*ca*cb*cg)
+    V=a*b*c*np.sqrt(1-ca**2-cb**2-cg**2+2*ca*cb*cg)
     return V
 
 def DebyeWallerFactor(ID,hkl,T=293,E=None):
@@ -654,19 +695,19 @@ def DebyeWallerFactor(ID,hkl,T=293,E=None):
         T is the crystal temperature in Kelvin (default is 293)
         E is photon energy in eV or keV (default is LCLS value)
     """
-    ID=checkID(ID)
-    E = getE(E)
+    ID=goodID(ID)
+    # E = getE(E)
     theta=BraggAngle(ID,hkl,E)
     l=lam(E)*u['ang']
     T_Debye=debyeTemp[ID]
     mass=MolecularMass(ID)
-    y=lambda x: x/(n.exp(x)-1)
+    y=lambda x: x/(np.exp(x)-1)
     ratio=T_Debye/float(T)
     intgrl,err=s.integrate.quad(y,1e-9,ratio)
     phi=intgrl*T/T_Debye    
     B=11492*T*phi/(mass*T_Debye**2)+2873/(mass*T_Debye)
     M=B*(sind(theta)/l)**2
-    DWfactor=n.exp(-M)
+    DWfactor=np.exp(-M)
     return DWfactor
 
 
@@ -678,13 +719,13 @@ def DarwinWidth(ID,hkl,E=None,T=293):
         T is the crystal temperature in Kelvin (default is 293)
     """
     ID = goodID(ID)
-    E = getE_keV(E)
+    # E = getE_keV(E)
     theta = BraggAngle(ID,hkl,E)
     l = lam(E)
     f = FF(ID,2*theta,E)
     F = StructureFactor(ID,f,hkl)
     V = UnitCellVolume(ID)
-    dw=(2*c['eRad']*l**2*np.abs(F))/(n.pi*V*sind(2*theta))/u['rad']
+    dw=(2*c['eRad']*l**2*np.abs(F))/(np.pi*V*sind(2*theta))/u['rad']
     return dw
 
 
@@ -703,8 +744,8 @@ def DarwinWidthE(ID,hkl,E=None,T=293):
 
 
 def DeltaEoE(ID,hkl,E=None,T=293):
-    ID=checkID(ID)
-    E = getE(E)
+    ID=goodID(ID)
+    # E = getE(E)
     theta=BraggAngle(ID,hkl,E)
     dw=DarwinWidth(ID,hkl,E,T)
     return 1/tand(theta)*dw*u['rad']
@@ -733,7 +774,7 @@ def loglog_negy_interp1d(x, y, xx):
             yy2 = np.exp(interp1d(np.log(x2), np.log(y2))(np.log(xx2)))
             return np.concatenate((yy1, yy2))
     else:   # all data are positive
-        return np.exp(interp1d(np.log(x), np.log(y))(np.log(xx)))
+        return np.exp(interp1d(np.log(x), np.log(y), bounds_error=False, fill_value='extrapolate')(np.log(xx)))
 
     
 def get_Ef1f2(Z, datafile='f1f2_EPDL97.dat'):

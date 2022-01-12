@@ -51,18 +51,62 @@ def goodID(matID, item=None):
     return id
 
 
-def lam(E,o=0):
-    """ Computes photon wavelength in m
-        E is photon energy in eV or keV
-        set o to 0 if working at sub-100 eV energies
-    """
-    if o:
-      E=E
+def eV(E):
+    """ Returns photon energy in eV if specified in eV or keV """
+    if np.max(E) < 100:
+        return E * 1000
     else:
-      E=eV(E)
-    lam=(12398.4/E)*1e-10
+        return E
+
+
+def keV(E):
+    """ Returns photon energy in keV if specified in eV or keV """
+    if np.min(E) >= 100:
+        return E / 1000
+    else:
+        return E
+   
+
+def lam(E):
+    """ Computes photon wavelength in m
+        E is photon energy in eV
+    """
     return (12398.4/E)*1e-10
 
+def lam2E(l):
+    """ Computes photon energy in eV
+        l is photon wavelength in m
+    """
+    E=12398.4/(l*u['ang'])
+    return E
+
+def lam2f(l):
+    """ Computes the photon frequency in Hz
+        l is photon wavelength in m
+    """
+    f=c['c']/l
+    return f
+    
+def f2lam(f):
+    """ Computes the photon wavelength in m
+        f is the photon frequency in Hz
+    """
+    l=c['c']/f
+    return l
+ 
+def f2E(f):
+    """ Computes the photon in energy in eV
+        f is the photon frequency in Hz
+    """
+    E=c['h']*f*u['eV']
+    return E
+ 
+def E2f(E):
+    """ Computes the photon frequency in Hz
+        E is photon energy in eV or keV
+    """
+    f=E/c['h']/u['eV']
+    return f
 
 def sind(A):
     """ Sin of an angle specified in degrees """
@@ -633,6 +677,7 @@ def BraggEnergy(ID,hkl,twotheta):
     E=lam2E(l)
     return E
 
+
 def StructureFactor(ID,f,hkl,z=None):
     """ Computes the structure factor
         ID is chemical fomula : 'Si'
@@ -654,14 +699,17 @@ def StructureFactor(ID,f,hkl,z=None):
         F=f
     elif L=='diamond':
         F=f*(1+np.exp(-i*np.pi*(k+l))+np.exp(-i*np.pi*(h+l))+np.exp(-i*np.pi*(h+k)))*(1+np.exp(-i*2*np.pi*(h/4.0+k/4.0+l/4.0)))
-    elif L=='rhomb':
-        z=latticeParamRhomb[ID]
-        F=f*(1+np.exp(2*i*np.pi*(h+k+l)*z)) 
+    # elif L=='rhomb':
+    #     z=latticeParamRhomb[ID]
+    #     F=f*(1+np.exp(2*i*np.pi*(h+k+l)*z)) 
     elif L=='tetr':
         F=f
     elif L=='hcp':
         F=f*(1+np.exp(2*i*np.pi*(h/3.0+2*k/3.0+l/2.0)))
+    else:
+        raise Exception(f'Unrecognized L: {L}')
     return F
+
 
 def StructureFactorE(ID,hkl,E=None,z=None):
     ID=goodID(ID)
@@ -669,6 +717,7 @@ def StructureFactorE(ID,hkl,E=None,z=None):
     theta=BraggAngle(ID,hkl,E)
     f=FF(ID,2*theta,E)
     return StructureFactor(ID,f,hkl,z)
+
     
 def UnitCellVolume(ID):
     """ Returns the unit cell volume in m^3
@@ -689,29 +738,29 @@ def UnitCellVolume(ID):
     V=a*b*c*np.sqrt(1-ca**2-cb**2-cg**2+2*ca*cb*cg)
     return V
 
-def DebyeWallerFactor(ID,hkl,T=293,E=None):
-    """ Computes the Debye Waller factor for a specified reflection
-        ID is chemical fomula : 'Si'
-        T is the crystal temperature in Kelvin (default is 293)
-        E is photon energy in eV or keV (default is LCLS value)
-    """
-    ID=goodID(ID)
-    # E = getE(E)
-    theta=BraggAngle(ID,hkl,E)
-    l=lam(E)*u['ang']
-    T_Debye=debyeTemp[ID]
-    mass=MolecularMass(ID)
-    y=lambda x: x/(np.exp(x)-1)
-    ratio=T_Debye/float(T)
-    intgrl,err=s.integrate.quad(y,1e-9,ratio)
-    phi=intgrl*T/T_Debye    
-    B=11492*T*phi/(mass*T_Debye**2)+2873/(mass*T_Debye)
-    M=B*(sind(theta)/l)**2
-    DWfactor=np.exp(-M)
-    return DWfactor
+# def DebyeWallerFactor(ID,hkl,T=293,E=None):
+#     """ Computes the Debye Waller factor for a specified reflection
+#         ID is chemical fomula : 'Si'
+#         T is the crystal temperature in Kelvin (default is 293)
+#         E is photon energy in eV or keV (default is LCLS value)
+#     """
+#     ID=goodID(ID)
+#     # E = getE(E)
+#     theta=BraggAngle(ID,hkl,E)
+#     l=lam(E)*u['ang']
+#     T_Debye=debyeTemp[ID]
+#     mass=MolecularMass(ID)
+#     y=lambda x: x/(np.exp(x)-1)
+#     ratio=T_Debye/float(T)
+#     intgrl,err=s.integrate.quad(y,1e-9,ratio)
+#     phi=intgrl*T/T_Debye    
+#     B=11492*T*phi/(mass*T_Debye**2)+2873/(mass*T_Debye)
+#     M=B*(sind(theta)/l)**2
+#     DWfactor=np.exp(-M)
+#     return DWfactor
 
 
-def DarwinWidth(ID,hkl,E=None,T=293):
+def DarwinWidth(ID, hkl, E=None,T=293):
     """ Computes the Darwin width for a specified crystal reflection (degrees)
         ID is chemical fomula : 'Si'
         hkl is the reflection : (1,1,1)
@@ -719,7 +768,7 @@ def DarwinWidth(ID,hkl,E=None,T=293):
         T is the crystal temperature in Kelvin (default is 293)
     """
     ID = goodID(ID)
-    # E = getE_keV(E)
+    E = eV(E)
     theta = BraggAngle(ID,hkl,E)
     l = lam(E)
     f = FF(ID,2*theta,E)
@@ -729,26 +778,66 @@ def DarwinWidth(ID,hkl,E=None,T=293):
     return dw
 
 
-def DarwinWidthE(ID,hkl,E=None,T=293):
+def DarwinWidthE(ID, hkl, E, T=293):
     """ Computes the delta E corresponding to the Darwin width for a specified crystal reflection (degrees)
         ID is chemical fomula : 'Si'
         hkl is the reflection : (1,1,1)
-        E is photon energy in eV or keV (default is LCLS value)
+        E is photon energy in eV or keV
         T is the crystal temperature in Kelvin (default is 293)
     """
-    dw       = DarwinWidth(ID,hkl,E,T)
-    theta    = BraggAngle(ID,hkl,E)
-    DeltaEoE = 1/tand(theta)*dw*u['rad']
-    DeltaE   = DeltaEoE*E
-    return DeltaE
+    E = eV(E)
+    return DeltaEoE(ID, hkl, E, T) * E
+    # ID = goodID(ID)
+    # E = eV(E)
+    # dw       = DarwinWidth(ID,hkl,E,T)
+    # theta    = BraggAngle(ID,hkl,E)
+    # DeltaEoE = 1/tand(theta) * dw * u['rad']
+    # DeltaE   = DeltaEoE * E
+    # return DeltaE
 
 
 def DeltaEoE(ID,hkl,E=None,T=293):
+    ID = goodID(ID)
+    E  = eV(E)
+    theta = BraggAngle(ID,hkl,E)
+    dw = DarwinWidth(ID,hkl,E,T)
+    return 1/tand(theta) * dw * u['rad']
+
+
+def index(ID,E=None):
     ID=goodID(ID)
-    # E = getE(E)
-    theta=BraggAngle(ID,hkl,E)
-    dw=DarwinWidth(ID,hkl,E,T)
-    return 1/tand(theta)*dw*u['rad']
+    E = keV(E)
+    d=Density[ID]
+    n_real=xl.Refractive_Index_Re(ID,E,d)
+    n_imag=xl.Refractive_Index_Im(ID,E,d)
+    n=complex(n_real,n_imag)
+    return n
+
+
+def FF(ID,twotheta,E=None):
+    """
+    Returns the atomic form factor for Rayleigh scattering
+    ID is the element name
+    twotheta is the scattering angle in degrees
+    E is the photon energy (default us current LCLS value)
+    """
+    E = keV(E)
+    ID=goodID(ID)
+    z=elementZ[ID]
+    q=MomentumTransfer(E, twotheta)
+    f=xl.FF_Rayl(z,q)
+    return f
+
+
+def MomentumTransfer(E,twotheta):
+  """Returns the momentum transfer in Ang^-1 from xraylib [sin(2theta)/lam]
+     E is the photon energy (eV or KeV)
+     twotheta is the scattering angle in degrees
+  """
+  E = keV(E)
+  th = np.deg2rad(twotheta)
+  p = xl.MomentTransf(E, th)
+  return p
 
 
 def loglog_negy_interp1d(x, y, xx):

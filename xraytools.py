@@ -3,6 +3,7 @@
 import os
 import numpy as np
 from scipy.interpolate import interp1d
+from scipy.special import dawsn, expi
 import matplotlib.pyplot as plt
 from matplotlib.ticker import ScalarFormatter
 import xraylib as xl
@@ -989,6 +990,28 @@ def Reflectivity_coated(E, theta, sub_mat, coat_mat, coat_thickness, f1f2data='d
 def mirror_defocus_ratio(src, mirror, focus, target):
     div_ratio = (mirror - src) / (focus - mirror)
     return np.abs(target - focus) / (target - src) * div_ratio
+
+
+def center_temp(power_W, rms_mm, attL_m, K):
+    ''' Surface temperature at beam center when beam hits a large material
+       power_W: beam power in Watt
+       rms_mm:  beam rms size in mm
+       attL_m:  attenuation length in meter
+       K:       thermal conductivity in W/m/K
+    '''
+    W = 1/attL_m * rms_mm * 0.001
+    Tmax = power_W / (2 * K * rms_mm*0.001 * np.sqrt(np.pi))
+    if np.isscalar(W):
+        if W < 50:
+            N = W * dawsn(W/2) - W/(2 * np.sqrt(np.pi)) * np.exp(-W**2/4) * expi(W**2/4)
+        else:
+            N = 1 - 2 / np.sqrt(np.pi) / W
+    else:
+        W1 = W[W<50]
+        W2 = W[W>=50]
+        N = np.concatenate((W1 * dawsn(W1/2) - W1/(2 * np.sqrt(np.pi)) * np.exp(-W1**2/4) * expi(W1**2/4),
+                            1 - 2 / np.sqrt(np.pi) / W2))
+    return Tmax * N
 
 
 """ Define units and constants

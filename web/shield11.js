@@ -345,6 +345,8 @@ function Src(type, angle) {
         Sorc = 4.93 * Math.pow(Zmat[IDtar], 0.662) * (3.6e-8/3.2e-8);
       else if(FTDSW == 2)
         Sorc = 4.93 * Math.pow(Zmat[IDtar], 0.662) * (4.69e-8/3.2e-8);
+      break;
+    
     case 1:  // MID: Mid-Energy Neutrons
       if(FTDSW == 0)
         Sorc = 43.9 / Math.pow(Amat[IDtar], 0.37) / (1.0 - 0.75 * CosThe);
@@ -352,11 +354,13 @@ function Src(type, angle) {
         Sorc = 43.9 / Math.pow(Amat[IDtar], 0.37) / (1.0 - 0.75 * CosThe) * (4.5e-8/3.2e-8);
       else if(FTDSW == 2)
         Sorc = 43.9 / Math.pow(Amat[IDtar], 0.37) / (1.0 - 0.75 * CosThe) * (9.94e-8/3.2e-8);
+      
       if(Ebeam <= 0.5)
         Sorc *= 1.6 * Math.pow(Ebeam, 1.5);
       else if(Ebeam > 0.5 && Ebeam < 1.0)
         Sorc *= 0.566 + 0.434 * (Ebeam - 0.5) / 0.5;
       break;
+
     case 2:  // HEN
       if(Ebeam <= ThrHEN)
         Sorc = 0.0
@@ -369,12 +373,16 @@ function Src(type, angle) {
           Sorc = 13.7 / Math.pow(Amat[IDtar], 0.65) / Math.pow((1.0 - 0.72 * CosThe), 2) * (1.23e-8/6.7e-8);
         if(Ebeam < 1.0) {
           for(var k = 1; k < 23; k++) {
-            var DelCS = (CS_HEN[k] - CS_HEN[k-1]) * (Ebeam - E_HEN[k-1]) / (E_HEN[k] - E_HEN[k-1]);
-            Sorc *= CS_HEN[k-1] + DelCS;
+            if(Ebeam < E_HEN[k]) {
+              var DelCS = (CS_HEN[k] - CS_HEN[k-1]) * (Ebeam - E_HEN[k-1]) / (E_HEN[k] - E_HEN[k-1]);
+              Sorc *= CS_HEN[k-1] + DelCS;
+              break;
+            }
           }
         }
       }
       break;
+
     case 3:  // GammaD
       Sorc = 1.06e6 * Ebeam * Math.exp(-TarLenGCM / Xmfp[3][IDtar]) * Math.exp(-0.959 * Math.sqrt(AbsAng/degree));
       if(AbsAng <= Math.PI/2)
@@ -382,6 +390,7 @@ function Src(type, angle) {
       else
         Sorc += 683.0 * Math.exp(-TarRadG) * Math.exp(-AbsAng/degree/72.2);
       break;
+
     case 4:  // GammaI
       if(Ebeam <= ThrHEN)
         Sorc = 0.0
@@ -394,10 +403,11 @@ function Src(type, angle) {
           Sorc = 13.7 / Math.pow(Amat[IDtar], 0.65) / Math.pow((1.0 - 0.72 * CosThe), 2) * (1.23e-8/6.7e-8);
         if(Ebeam < 1.0) {
           for(var k = 1; k < 23; k++) {
-            if(Ebeam < E_HEN[k])
+            if(Ebeam < E_HEN[k]) {
               var DelCS = (CS_HEN[k] - CS_HEN[k-1]) * (Ebeam - E_HEN[k-1]) / (E_HEN[k] - E_HEN[k-1]);
               Sorc *= CS_HEN[k-1] + DelCS;
-            break;
+              break;
+            }
           }
         }
       }

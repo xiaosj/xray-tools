@@ -323,7 +323,7 @@ def drillSpeed(matID, W, FWHM_mm):
     if matID not in vaporH.keys():
         raise ValueError(f'No vaporization data for {matID}: available in {vaporH.keys()}')
     
-    mol_mmD = np.pi * (FWHM_mm/2)**2 / 1000 * defaultDensity(matID) / molarMass(matID)
+    mol_mmD = 2 * np.pi * (FWHM_mm/2.355)**2 / 1000 * defaultDensity(matID) / molarMass(matID)
     return W / (mol_mmD * vaporH[matID] * 1000)
 
 
@@ -621,6 +621,242 @@ def K2C(degK):
     return degK - 273.15
 
 
+def temp3d_uniform(x, y, z, power, q, lx, ly, T_surface_avg,
+                   width, height, thickness, K, T_env=300.0, verbose=0):
+    ''' Calculate the temperature for radiation cooling with uniform input power '''
+    Lx = width * 0.5
+    Ly = height * 0.5
+    h = thickness
+
+    h_eff = power / (width * height * (T_surface_avg - T_env))
+    t = 0.00001
+    Ktwid = h_eff * t
+    S = 0.5 * (1 - Ktwid / K)
+    R = 0.5 * (1 + Ktwid / K)
+    
+    nx = int(Lx / lx)
+    if nx < 20:
+        nx = 20
+    ny = int(Ly / ly)
+    if ny < 20:
+        ny = 20
+    
+    T = q * lx * ly / (2 * Lx * Ly) * (t / Ktwid + (h - z) / K)
+
+    if verbose > 1:
+        print(f'power = {power}, q = {q}, lx = {lx}, ly = {ly}, T_surface_avg = {T_surface_avg}')
+        print(f'Lx = {Lx}, Ly = {Ly}, h = {h}')
+        print(f'h_eff = {h_eff:.3g}, Ktwid = {Ktwid:.3g}')
+        print(f'S = {S}, R = {R}')
+        print(f'nx = {nx}, ny = {ny}')
+        
+    for m in range(1, nx+1):
+        omega = m * np.pi / Lx
+        gamma = omega
+        temp  = -2 * q * ly * np.sin(omega * lx) * np.cos(omega * x) * (S * np.sinh(gamma * (z + t - h)) + R * np.sinh(gamma * (h + t - z)))
+        temp /= omega * gamma * K * Lx * Ly * (S * np.cosh(gamma * (t-h)) - R * np.cosh(gamma * (t + h)))
+        T += temp
+    
+    for n in range(1, ny+1):
+        phi   = n * np.pi / Ly
+        gamma = phi
+        temp  = -2 * q * lx * np.sin(phi * ly) * np.cos(phi * y) * (S * np.sinh(gamma * (z + t - h)) + R * np.sinh(gamma * (h + t - z)))
+        temp /= gamma * K * Lx * Ly * (S * np.cosh(gamma * (t-h)) - R * np.cosh(gamma * (t + h)))
+        T += temp
+    
+    for m in range(1, nx+1):
+        for n in range(1, ny+1):
+            omega = m * np.pi / Lx
+            phi   = n * np.pi / Ly
+            gamma = np.sqrt(omega * omega + phi * phi)
+            temp  = -4 * q * np.sin(omega * lx) * np.sin(phi * ly) * np.cos(omega * x) * np.cos(phi * y)
+            temp *= S * np.sinh(gamma * (z + t - h)) + R * np.sinh(gamma * (h + t - z))
+            temp /= omega * gamma * K * Lx * Ly * (S * np.cosh(gamma * (t-h)) - R * np.cosh(gamma * (t + h)))
+            T += temp
+        
+    return T + T_env
+
+def temp3d_1dGaussian(x, y, z, power, q, lx, sigma_y, T_surface_avg,
+                   width, height, thickness, K, T_env=300.0, verbose=0):
+    ''' Calculate the temperature for radiation cooling with 1D Gaussian input power '''
+    r2pi = np.sqrt(2 * np.pi)    
+    Lx = width * 0.5
+    Ly = height * 0.5
+    h = thickness
+
+    h_eff = power / (width * height * (T_surface_avg - T_env))
+    t = 0.00001
+    Ktwid = h_eff * t
+    S = 0.5 * (1 - Ktwid / K)
+    R = 0.5 * (1 + Ktwid / K)
+    
+    nx = int(Lx / lx)
+    if nx < 20:
+        nx = 20
+    ny = int(Ly / sigma_y)
+    if ny < 20:
+        ny = 20
+    
+    T = r2pi * sigma_y * q * lx / (2 * Lx * Ly) * (t / Ktwid + (h - z) / K)
+
+    if verbose > 1:
+        print(f'power = {power}, q = {q}, lx = {lx}, sigma_y = {sigma_y}, T_surface_avg = {T_surface_avg}')
+        print(f'Lx = {Lx}, Ly = {Ly}, h = {h}')
+        print(f'h_eff = {h_eff:.3g}, Ktwid = {Ktwid:.3g}')
+        print(f'S = {S}, R = {R}')
+        print(f'nx = {nx}, ny = {ny}')
+        
+    for m in range(1, nx+1):
+        omega = m * np.pi / Lx
+        gamma = omega
+        temp  = -r2pi * sigma_y * q * np.sin(omega * lx) * np.cos(omega * x) * (S * np.sinh(gamma * (z + t - h)) + R * np.sinh(gamma * (h + t - z)))
+        temp /= omega * gamma * K * Lx * Ly * (S * np.cosh(gamma * (t-h)) - R * np.cosh(gamma * (t + h)))
+        T += temp
+    
+    for n in range(1, ny+1):
+        phi   = n * np.pi / Ly
+        gamma = phi
+        temp  = -r2pi * sigma_y * q * lx * np.exp(-0.5 * (phi * sigma_y)**2) * np.cos(phi * y) * (S * np.sinh(gamma * (z + t - h)) + R * np.sinh(gamma * (h + t - z)))
+        temp /= gamma * K * Lx * Ly * (S * np.cosh(gamma * (t-h)) - R * np.cosh(gamma * (t + h)))
+        T += temp
+    
+    for m in range(1, nx+1):
+        for n in range(1, ny+1):
+            omega = m * np.pi / Lx
+            phi   = n * np.pi / Ly
+            gamma = np.sqrt(omega * omega + phi * phi)
+            temp  = -2 * r2pi * sigma_y * q * np.sin(omega * lx) * np.exp(-0.5 * (phi * sigma_y)**2) * np.cos(omega * x) * np.cos(phi * y)
+            temp *= S * np.sinh(gamma * (z + t - h)) + R * np.sinh(gamma * (h + t - z))
+            temp /= omega * gamma * K * Lx * Ly * (S * np.cosh(gamma * (t-h)) - R * np.cosh(gamma * (t + h)))
+            T += temp
+        
+    return T + T_env
+
+
+def temp3d_2dGaussian(x, y, z, power, q, sigma_x, sigma_y, T_surface_avg,
+                      width, height, thickness, K, T_env=300.0, verbose=0):
+    ''' Calculate the temperature for radiation cooling with 2D Gaussian input power '''
+    Lx = width * 0.5
+    Ly = height * 0.5
+    h = thickness
+
+    h_eff = power / (width * height * (T_surface_avg - T_env))
+    t = 0.00001
+    Ktwid = h_eff * t
+    S = 0.5 * (1 - Ktwid / K)
+    R = 0.5 * (1 + Ktwid / K)
+    
+    nx = int(Lx / sigma_x)
+    if nx < 20:
+        nx = 20
+    ny = int(Ly / sigma_y)
+    if ny < 20:
+        ny = 20
+    
+    piqxy = np.pi * q * sigma_x * sigma_y
+    T = piqxy / (2 * Lx * Ly) * (t / Ktwid + (h - z) / K)
+
+    if verbose > 1:
+        print(f'power = {power}, q = {q}, lx = {sigma_x}, sigma_y = {sigma_y}, T_surface_avg = {T_surface_avg}')
+        print(f'Lx = {Lx}, Ly = {Ly}, h = {h}')
+        print(f'h_eff = {h_eff:.3g}, Ktwid = {Ktwid:.3g}')
+        print(f'S = {S}, R = {R}')
+        print(f'nx = {nx}, ny = {ny}')
+    
+    for m in range(1, nx+1):
+        omega = m * np.pi / Lx
+        gamma = omega
+        temp  = -piqxy * np.exp(-0.5 * (omega * sigma_x)**2) * np.cos(omega * x) * (S * np.sinh(gamma * (z + t - h)) + R * np.sinh(gamma * (h + t - z)))
+        temp /= gamma * K * Lx * Ly * (S * np.cosh(gamma * (t-h)) - R * np.cosh(gamma * (t + h)))
+        T += temp
+    
+    for n in range(1, ny+1):
+        phi   = n * np.pi / Ly
+        gamma = phi
+        temp  = -piqxy * np.exp(-0.5 * (phi * sigma_y)**2) * np.cos(phi * y) * (S * np.sinh(gamma * (z + t - h)) + R * np.sinh(gamma * (h + t - z)))
+        temp /= gamma * K * Lx * Ly * (S * np.cosh(gamma * (t-h)) - R * np.cosh(gamma * (t + h)))
+        T += temp
+    
+    for m in range(1, nx+1):
+        for n in range(1, ny+1):
+            omega = m * np.pi / Lx
+            phi   = n * np.pi / Ly
+            gamma = np.sqrt(omega * omega + phi * phi)
+            temp  = -piqxy * np.exp(-0.5 * ((omega * sigma_x)**2 + (phi * sigma_y)**2)) * np.cos(omega * x) * np.cos(phi * y)
+            temp *= S * np.sinh(gamma * (z + t - h)) + R * np.sinh(gamma * (h + t - z))
+            temp /= gamma * K * Lx * Ly * (S * np.cosh(gamma * (t-h)) - R * np.cosh(gamma * (t + h)))
+            T += temp
+        
+    return T + T_env
+
+
+def radiation_cooling(power:float, beam_mode:int, q:float, lx:float, ly:float, 
+                      target_width:float, target_height:float, target_thickness:float,
+                      target_K:float, target_emissivity:float,
+                      env_emissivity:float, T_env=300.0, back_rad_only=False, verbose=0):
+    ''' Calculate the temperature from radiation cooling (Not Vectorized)
+    Input:
+        power: beam power in Watts
+        beam_mode: 0 - uniform beam; 1 - 1D Gaussian on Y; 2 - 2D Gaussian
+        q: power density in W/mm2
+        lx: half beam size on X, mm (rms for Gaussian beam)
+        ly: half beam size on Y, mm (rms for Gaussian beam)
+        target_width: target width in mm
+        target_height: target height in mm
+        target_thickness: target thickness in mm
+        target_K: target thermal conductivity in W/mm/K
+        target_emissivity: target emissivity
+        env_emissivity: environment emissivity
+        T_env: environment temperature in K
+        back_rad_only: whether radiation is on the back side only
+        verbose: verbose level for output
+        
+    Return:
+        Tmax: the maximum temperature on target (K)
+        T_surface_avg, T000, Tmin, T_env: facilitate temperatures (K)
+        ratio: if it is >>1, need to set back_rad_only=True
+    '''
+    # Step 1: estimate an average surface temperature using radiation cooling of the entire mask surface and calculate h_eff using this ave temperature with radiation cooling of mask back surface only
+    if back_rad_only:
+        area = target_width * target_height
+    else:
+        area = 2 * (target_width * target_height + target_width * target_thickness + target_height * target_thickness)
+    emissivity_eff = target_emissivity * env_emissivity / (target_emissivity + env_emissivity - target_emissivity * env_emissivity)
+    sigma = 5.67e-14  # Stefan-Boltzmann constant in W/mm2/K4
+    T_surface_avg = (power / (sigma * area * emissivity_eff) + T_env**4) **0.25
+    
+    # Step 2: calculate the temperature distribution in the mask hot wall (front layer) using h_eff and the analytic two layer model of M302
+    if beam_mode == 0:
+        T000 = temp3d_uniform(0, 0, 0, power, q, lx, ly, T_surface_avg,
+                    target_width, target_height, target_thickness, target_K, T_env=T_env, verbose=verbose)
+        Tmin = temp3d_uniform(target_width/2, target_height/2, target_thickness, power, q, lx, ly, T_surface_avg,
+                    target_width, target_height, target_thickness, target_K, T_env=T_env, verbose=verbose)
+    elif beam_mode == 1:
+        T000 = temp3d_1dGaussian(0, 0, 0, power, q, lx, ly, T_surface_avg,
+                    target_width, target_height, target_thickness, target_K, T_env=T_env, verbose=verbose)
+        Tmin = temp3d_1dGaussian(target_width/2, target_height/2, target_thickness, power, q, lx, ly, T_surface_avg,
+                    target_width, target_height, target_thickness, target_K, T_env=T_env, verbose=verbose)
+    elif beam_mode == 2:
+        T000 = temp3d_2dGaussian(0, 0, 0, power, q, lx, ly, T_surface_avg,
+                    target_width, target_height, target_thickness, target_K, T_env=T_env, verbose=verbose)
+        Tmin = temp3d_2dGaussian(target_width/2, target_height/2, target_thickness, power, q, lx, ly, T_surface_avg,
+                    target_width, target_height, target_thickness, target_K, T_env=T_env, verbose=verbose)
+    else:
+        raise Exception(f'Wrong beam mode [{beam_mode}]: must be 0, 1 or 2')
+
+    Tmax = T_surface_avg + T000 - Tmin
+    
+    # Check if it is conservative
+    # dT1 = T000 - Tmin
+    # ratio1 = 2 * ((Tmax - dT1)**4 - T_env**4) / ((target_melt - dT1)**4 - T_env**4)
+    ratio = (T_surface_avg - T_env) / (Tmax - Tmin)
+    
+    if verbose > 0:
+        print(f'Tmax = {K2C(Tmax):.1f}, T000 = {K2C(T000):.1f}, Tmin = {Tmin:.1f} deg-C')
+
+    return (Tmax, T_surface_avg, T000, Tmin, T_env, ratio)
+
+
 def dSpace(ID,hkl):
     """ Computes the d spacing (m) of the specified material and reflection 
         ID is chemical fomula : 'Si'
@@ -659,9 +895,8 @@ def BraggAngle(ID,hkl,E=None):
         hkl is the reflection : (1,1,1)
         E is photon energy in eV or keV (default is LCLS value)
     """
-    ID=goodID(ID)
-    # E = getE(E)
-    d=dSpace(ID,hkl)
+    E = eV(E)
+    d = dSpace(ID,hkl)
     theta = asind(lam(E)/2/d)
     return theta
 
@@ -761,7 +996,7 @@ def UnitCellVolume(ID):
 #     return DWfactor
 
 
-def DarwinWidth(ID, hkl, E=None,T=293):
+def DarwinWidth(ID, hkl, E, T=293):
     """ Computes the Darwin width for a specified crystal reflection (degrees)
         ID is chemical fomula : 'Si'
         hkl is the reflection : (1,1,1)
@@ -797,8 +1032,7 @@ def DarwinWidthE(ID, hkl, E, T=293):
     # return DeltaE
 
 
-def DeltaEoE(ID,hkl,E=None,T=293):
-    ID = goodID(ID)
+def DeltaEoE(ID, hkl, E, T=293):
     E  = eV(E)
     theta = BraggAngle(ID,hkl,E)
     dw = DarwinWidth(ID,hkl,E,T)
@@ -2048,7 +2282,8 @@ latticeType = {'H' :'hcp',
      'LaMnO3':'ortho',
      'LaAlO3':'rhomb',
      'La0.7Sr0.3MnO3':'rhomb',
-     'GGG':'cubic'
+     'GGG':'cubic',
+     'YAG':'cubic'
 }
 
 
@@ -2142,7 +2377,8 @@ latticeParameters = {
      'LaMnO3':(5.531,5.602,7.742,90,90,90),  
      'LaAlO3':(5.377,5.377,5.377,60.13,60.13,60.13),
      'La0.7Sr0.3MnO3':(5.4738,5.4738,5.4738,60.45,60.45,60.45),
-     'Gd3Ga5O12':(12.383,12.383,12.383,90,90,90)
+     'Gd3Ga5O12':(12.383,12.383,12.383,90,90,90),
+     'YAG':(12.006,12.006,12.006,90,90,90)  # from https://x-server.gmca.aps.anl.gov/cgi/www_form.exe?template=x0h_form.htm
 }
 
  

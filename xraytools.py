@@ -187,7 +187,8 @@ def mu(matID, keV, density=None):
         energies = np.array(keV, dtype=np.double)
     _mu = np.array([xl.CS_Total_CP(mat, eng) * density * u['cm'] for eng in energies])
     if np.isscalar(keV):
-        return np.asscalar(_mu)
+        # return np.asscalar(_mu), numpy-asscalar() has been deprecated since NumPy 1.16
+        return _mu.item()
     else:
         return _mu
 
@@ -1926,7 +1927,8 @@ meltPoint = {'H' :14.175,
      'La0.7Sr0.3MnO3':370, # ferro to para magnetic phase transition
      'LaAlO3':708,      # 708 K phase trans, melt point is 2350 K
      'B4C':2743,
-     'SiC':3100
+     'SiC':3100,
+     'YAG':2213   # https://www.crystran.co.uk/optical-materials/yttrium-aluminium-garnet-yag
 }
 
 # Boiling point in K 

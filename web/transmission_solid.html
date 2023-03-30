@@ -7,13 +7,16 @@
 </head>
 
 <!-- <script src="//cdnjs.cloudflare.com/ajax/libs/dygraph/2.1.0/dygraph.min.js"></script> -->
+<script src="jquery.js"></script>
 <script src="dygraph.min.js"></script>
-<script src="Standard_Densities.js"></script>
+<!-- <script src="Standard_Densities.js"></script> -->
 <script src="CrossSec_NISTxaamdi.js"></script>
 <script src="utilities.js"></script>
 
 <script type="text/javascript">
-var densities = Standard_Densities;
+var databaseURL = ""; //"https://slac.stanford.edu/~xiaosj/DABAX_web/";
+var densities = {};
+var lastDensityDatabase = "";
 var xSections = CrossSec_NISTxaamdi;
 var xType;
 var Emin, Emax;
@@ -28,8 +31,8 @@ var graph;
 // Validate element input
 function validateSymbol() {
     symbol = document.getElementById('symbol').value;
-    if(symbol in densities && symbol in xSections) {
-        defaultDensity = densities[symbol];
+    if(symbol in xSections) {
+        defaultDensity = getDefaultDensity(symbol) //densities[symbol];
         document.getElementById('density').disabled = false;
         document.getElementById('default_density').innerHTML = defaultDensity;
         xsec = xSections[symbol];
@@ -39,6 +42,49 @@ function validateSymbol() {
     } else {
         document.getElementById('density').disabled = true;
         document.getElementById('default_density').innerHTML = 'None';
+    }
+}
+
+function getDefaultDensity(symbol) {
+    database = document.getElementById('densityDatabase').value;
+    var readDone;
+    if(database != lastDensityDatabase) {
+        // var xmlhttp = new XMLHttpRequest();
+        // xmlhttp.onreadystatechange = function() {
+        //     console.log(this.responseText);
+        //     // densities = JSON.parse(this.responseText);
+        // }
+        readDone = false
+        if(database == "default") {
+            // densities = JSON.parse("Density.json");
+            var url = databaseURL + "Density.json";
+            // console.log(url);
+            // xmlhttp.open("GET", url, true);
+            // xmlhttp.send();
+            // $.getScript("Standard_Densities.js", function(){
+            //     densities = load_densities;
+            // });
+            $.getJSON(url, function(result, status) {
+                console.log(result);
+                densities = result;
+                // console.log(densities);
+                // Object.assign(densities, result);
+                // densities = {};
+                // for (var key in result) {
+                //     densities[key] = result[key];
+                // }
+            })
+        } else {
+            // densities = JSON.parse("AtomicDensity_" + database + ".json");
+        }
+        lastDensityDatabase = database;
+    } else {
+        readDone = true;
+    }
+    
+    console.log(densities);
+    if(symbol in densities) {
+        return densities[symbol];
     }
 }
 
@@ -146,7 +192,13 @@ Element symbol:
 <input id="symbol" type="text" value="Fe" size=15 onchange="validateSymbol();drawIt();"><br>
 
 Density: <input id="density" type="number" value=-1.0 onchange="setDensity();drawIt();">
-(negative for default density: <label id="default_density"></label> g/cm<sup>3</sup>)<br>
+(negative for default density: <label id="default_density"></label> g/cm<sup>3</sup>)
+<select id="densityDatabase">
+    <option value="default">Default</option>
+    <option value="DABX">DABX</option>
+    <option value="NIST5632">NIST5632</option>
+</select>
+<br>
 
 Draw as function of: 
 <input type="radio" name="chooseX" checked="checked" onchange="chooseX(0);"> Energy

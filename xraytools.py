@@ -7,7 +7,6 @@ from scipy.special import dawsn, expi
 import matplotlib.pyplot as plt
 from matplotlib.ticker import ScalarFormatter
 import xraylib as xl
-import os
 
 
 def goodID(matID, item=None):

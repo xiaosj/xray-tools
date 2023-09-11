@@ -241,7 +241,8 @@ def eVatom(matID, keV, mJ, rms_mm, density=None):
     attL = attenuationLength(matID, keV, density)
     EdensityJcm3 = mJ/1000 / (2 * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
     atomVolcm3 = atomWeight(matID) / c['NA'] / density
-    return EdensityJcm3 * atomVolcm3 / 1.6e-19
+    natoms = xl.CompoundParser(matID)['nAtomsAll']
+    return EdensityJcm3 * atomVolcm3 / 1.6e-19 / natoms
 
 
 def eVatom_en(matID, keV, mJ, rms_mm, density=None):
@@ -257,7 +258,8 @@ def eVatom_en(matID, keV, mJ, rms_mm, density=None):
     attL = 1.0 / mu_en(matID, keV, density)
     EdensityJcm3 = mJ/1000 / (2 * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
     atomVolcm3 = atomWeight(matID) / c['NA'] / density
-    return EdensityJcm3 * atomVolcm3 / 1.6e-19
+    natoms = xl.CompoundParser(matID)['nAtomsAll']
+    return EdensityJcm3 * atomVolcm3 / 1.6e-19 / natoms
 
 
 def eVatom_keV_plot(matID, keV, mJ, rms_mm, density=None, logx=False, logy=True):
@@ -415,7 +417,7 @@ def pulseT(matID, keV, mJ, rms_mm, density=None, baseT=298.15):
 
     T_Jmol = interp1d(Jmol, T, fill_value='extrapolate')  # T as function of J/mol
 
-    return T_Jmol(EdensityJmol + Jmol_base)
+    return T_Jmol(EdensityJmol + Jmol_base) - baseT
 
 
 def pulseTC(matID, keV, mJ, rms_mm, density=None, baseT=25):
@@ -427,7 +429,7 @@ def pulseTC(matID, keV, mJ, rms_mm, density=None, baseT=25):
         * density: in g/cm3, None=default density
         * baseT: base temperature (K), 298 K in default
     """
-    return K2C(pulseT(matID, keV, mJ, rms_mm, density=density, baseT=C2K(baseT)))
+    return pulseT(matID, keV, mJ, rms_mm, density=density, baseT=C2K(baseT))
 
 
 def spectrum_cut(spectrum, eVrange=(0.0, 0.0)):

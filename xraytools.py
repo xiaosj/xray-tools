@@ -313,22 +313,22 @@ def eVatom_keV_plot(matID, keV, mJ, rms_mm, density=None, logx=False, logy=True)
         plt.show()
 
 
-def drillSpeed(matID, W, FWHM_mm):
+def drillSpeed(matID, power_W, FWHM_mm):
     """ Return the material drill speed (mm/s) based on vaporization heat """
     vaporH = {  # kJ/mol
         # spec heat from room temperature to melting + latent heat of fusion + spec heat from melting to boiling + latent heat of vaporization
         # refer https://webbook.nist.gov/chemistry/ for heat capacity, this tool also has some data in specificHeatParams
-        'Cu':  29.7 + 13.1 + 48.8 + 300,
-        'Fe':  49.5 + 13.8 + 60.9 + 340,
-        'W' : 118.4 + 46.9 + 82.5 + 824,
-        'Mo':  89.9 + 37.5 + 71.9 + 598,
-        'Al': 17.98 + 10.7 + 0.03175*1857 + 294
+        'Cu': 29.67 + 13.26 + 48.77 + 300,
+        'Fe': 49.62 + 13.81 + 60.89 + 340,
+        'W' :119.39 + 52.31 + 89.19 + 774,
+        'Mo':  89.9 + 37.5  + 71.9  + 598,
+        'Al': 17.97 + 10.71 + 59.06 + 284
     }
     if matID not in vaporH.keys():
         raise ValueError(f'No vaporization data for {matID}: available in {vaporH.keys()}')
     
     mol_mmD = 2 * np.pi * (FWHM_mm/2.355)**2 / 1000 * defaultDensity(matID) / molarMass(matID)
-    return W / (mol_mmD * vaporH[matID] * 1000)
+    return power_W / (mol_mmD * vaporH[matID] * 1000)
 
 
 def drillTime(matID, thickness_mm, W, FWHM_mm):

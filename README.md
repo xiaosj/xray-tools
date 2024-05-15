@@ -4,10 +4,10 @@ Set of tools for x-ray analysis.
 ## xraytools.py
 Various tools for x-ray calculations
 * Dependency: [xraylib](https://github.com/tschoonj/xraylib), numpy, scipy, matplotlib.
-    * Maybe easier to install xraylib via [Anaconda](https://anaconda.org/conda-forge/xraylib):
-      '''
+    * Maybe easier to install xraylib via Anaconda, see below or more in [the page](https://anaconda.org/conda-forge/xraylib):
+      ```
       conda install conda-forge::xraylib
-      '''
+      ```
 * f1f2_EPDL97.dat & f1f2_Windt.dat: Atomic scattering factor data. "EPDL97" is the default.
 * f2d_photon: Fluence to dose coversion factor for photons.
 

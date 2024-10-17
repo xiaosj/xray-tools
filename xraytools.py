@@ -572,7 +572,7 @@ def spectrum_shield(spectrum, area_cm2, matID, density=None, eVrange=(0.0,0.0), 
     return t1
 
 
-def plot(x, y, xlabel=None, ylabel=None, title=None, figsize=(4,2.8), logx=False, logy=False, xmin=None, xmax=None, ymin=None, ymax=None, savefig=None):
+def plot(x, y, xlabel=None, ylabel=None, title=None, figsize=(4.5,3), logx=False, logy=False, xmin=None, xmax=None, ymin=None, ymax=None, savefig=None):
     ''' Plot function
     '''
     plt.figure(figsize=figsize, dpi=100, facecolor='white')
@@ -1251,6 +1251,94 @@ def center_temp(power_W, rms_mm, attL_m, K):
                             1 - 2 / np.sqrt(np.pi) / W2))
     return Tmax * N
 
+def keV2lamda(keV):
+    ''' Covert photon energy to wavelength in m (SI unit)
+    '''
+    return 1239.8 / (keV*1000) * 1e-9
+
+def lamda2keV(lamda_nm):
+    ''' Convert photon wavelength to energy in keV
+        lamda_nm: wavelength in nm
+    '''
+    return 1239.8 / lamda_nm * 0.001
+
+## Gaussian beam propogation
+def RayleighRange(keV, w0, n=1):
+    ''' Return the Rayleigh range in m (SI unit)
+       keV: photon energy in keV
+       w0:  waist size in um
+       n:   refractive index of the medium (default 1 for vacuum)
+    '''
+    return np.pi * (w0*1e-6)**2 * n / keV2lamda(keV)
+
+class GaussianBeam:
+    def __init__(self, keV, w0):
+        ''' Initialize a Gaussian beam
+            keV: photon energy
+            z0:  waist location in m
+            w0:  waist size in um, use diameter not radius
+        '''
+        self.keV = keV
+        self.w0 = w0
+        zR = RayleighRange(keV, w0)
+        self.lamda = keV2lamda(keV)
+        self.q0 = zR * 1j
+        self.q = self.q0
+        self.propogation = []
+
+    ## Transport functions
+    def FreeSpace(self, d):
+        ''' Transport in free space (n=1)
+            d: transport distance in m
+        '''
+        self.propogation.append(("Free Space", d))
+        self.q = self.q + d
+        self.R = self.getR()
+        self.w = self.getw()
+        self.rms = self.w / 2
+
+    def ThinLens(self, f):
+        ''' Transport through a think lens
+            f: focal length in m
+        '''
+        self.propogation.append(("Thin Lens", f))
+        self.q = 1 / (1/self.q - 1/f)
+        self.R = self.getR()
+        self.w = self.getw()
+        self.rms = self.w / 2
+
+    ## Get beam information
+    def getR(self):
+        ''' Get the radius of curvature in m (positive for diverging, negative for convergin)
+        '''
+        # if self.q.real == 0:
+        #     return np.inf
+        # else:
+        return 1 / (1/self.q).real
+
+    def getw(self):
+        ''' Get the waist in um
+        '''
+        im = (1/self.q).imag
+        return np.sqrt(-self.lamda / (np.pi * im)) * 1e6
+
+    def print(self):
+        ''' Print beam information
+        '''
+        print(f'{self.keV} keV, {self.w0} um waist:')
+        print('Propogation List:')
+        for i in range(len(self.propogation)):
+            if self.propogation[i][0] == "Free Space":
+                print(f'  {i+1}. Free Space {self.propogation[i][1]} m')
+            if self.propogation[i][0] == "Thin Lens":
+                print(f'  {i+1}. Thin Lens with {self.propogation[i][1]} m focal length')
+        print(f'Complex beam parameter q = {self.q}')
+        print(f'Radius of curvature R = {self.R} m')
+        print(f'Beam waist = {self.w} um, rms = {self.rms} um')
+
+    def reset(nstep=0):
+        ''' Reset '''
+        return
 
 """ Define units and constants
     - Muliply to convert from SI unit to the target unit:
@@ -1821,7 +1909,7 @@ Density = {'H' :0.00008988,
      'C1.5H0.3O4.3N0.4PCa2.2':1.92,
      'Be0.9983O0.0003Al0.0001Ca0.0002C0.0003Cr0.000035Co0.000005Cu0.00005Fe0.0003Pb0.000005Mg0.00006Mn0.00003Mo0.00001Ni0.0002Si0.0001Ag0.000005Ti0.00001Zn0.0001':1.85,
      'Be.994O.004Al.0005B.000003Cd.0000002Ca.0001C.0006Cr.0001Co.00001Cu.0001Fe.0008Pb.00002Li.000003Mg.00049Mn.0001Mo.00002Ni.0002N.0003Si.0004Ag.00001':1.85,
-     'Air':0.001225,
+     'Air':0.001225,  #  International Standard Atmosphere (ISA) values: 15 degC at sea level
      'air':0.001225
 }
 

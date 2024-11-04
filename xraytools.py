@@ -1126,6 +1126,15 @@ def get_Ef1f2(Z, datafile='f1f2_EPDL97.dat'):
 
 
 def Reflectivity_uncoated(E, theta, sub_mat, f1f2data='default', f1f2interp='linear'):
+    '''
+        E: photon energy in eV
+        theta: incideng angle in rad
+        sub_mat: material ID of substrate
+        f1f2data:   'default', use 'f1f2_EPDL97.dat' file;
+                    name data file (currently have 'f1f2_Windt.dat')
+        f1f2interp: 'linear', default, linear interpolation for photon energy
+                    else, log-log interpolation
+    '''
     E = np.asarray(E, dtype=np.float64)
     scalar_E = False
     if E.ndim == 0:
@@ -1163,6 +1172,17 @@ def Reflectivity_uncoated(E, theta, sub_mat, f1f2data='default', f1f2interp='lin
 
 
 def Reflectivity_coated(E, theta, sub_mat, coat_mat, coat_thickness, f1f2data='default', f1f2interp='linear'):
+    '''
+        E: photon energy in eV
+        theta: incideng angle in rad
+        sub_mat: material ID of substrate
+        coat_mat: material ID of coating
+        coat_thickness: coating thickness in m
+        f1f2data:   'default', use 'f1f2_EPDL97.dat' file;
+                    name data file (currently have 'f1f2_Windt.dat')
+        f1f2interp: 'linear', default, linear interpolation for photon energy
+                    else, log-log interpolation
+    '''
     E = np.asarray(E, dtype=np.float64)
     scalar_E = False
     if E.ndim == 0:
@@ -1270,6 +1290,15 @@ def RayleighRange(keV, w0, n=1):
        n:   refractive index of the medium (default 1 for vacuum)
     '''
     return np.pi * (w0*1e-6)**2 * n / keV2lamda(keV)
+
+def LensFocalLength(keV, radius_um, matID='Be'):
+    ''' Return the focal length in m
+        keV: photon energy in keV
+        radius_um: effectiv radius of lens
+        matID: material of lens, default as Be (beryllium)
+    '''
+    delta = 1 - xl.Refractive_Index_Re(matID, keV*1000, Density[matID])
+    return radius_um * 1e-6 / (2 * delta)
 
 class GaussianBeam:
     def __init__(self, keV, w0):

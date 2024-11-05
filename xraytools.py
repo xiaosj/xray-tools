@@ -1297,8 +1297,11 @@ def LensFocalLength(keV, radius_um, matID='Be'):
         radius_um: effectiv radius of lens
         matID: material of lens, default as Be (beryllium)
     '''
-    delta = 1 - xl.Refractive_Index_Re(matID, keV*1000, Density[matID])
+    delta = 1 - xl.Refractive_Index_Re(matID, keV, Density[matID])
     return radius_um * 1e-6 / (2 * delta)
+
+def LensFocalSigma():
+    pass
 
 class GaussianBeam:
     def __init__(self, keV, w0):

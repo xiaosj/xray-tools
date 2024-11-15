@@ -1283,7 +1283,7 @@ def lamda2keV(lamda_nm):
     return 1239.8 / lamda_nm * 0.001
 
 ## Gaussian beam propogation
-def RayleighRange(keV, w0, n=1):
+def RayleighLength(keV, w0, n=1):
     ''' Return the Rayleigh range in m (SI unit)
        keV: photon energy in keV
        w0:  waist size in um
@@ -1292,7 +1292,8 @@ def RayleighRange(keV, w0, n=1):
     return np.pi * (w0*1e-6)**2 * n / keV2lamda(keV)
 
 def LensFocalLength(keV, radius_um, matID='Be'):
-    ''' Return the focal length in m
+    ''' Return the focal length of a lens in m
+        Note: Use LensFocalDistance to calculate for a specific source
         keV: photon energy in keV
         radius_um: effectiv radius of lens
         matID: material of lens, default as Be (beryllium)
@@ -1300,8 +1301,31 @@ def LensFocalLength(keV, radius_um, matID='Be'):
     delta = 1 - xl.Refractive_Index_Re(matID, keV, Density[matID])
     return radius_um * 1e-6 / (2 * delta)
 
-def LensFocalSigma():
-    pass
+def LensFocalDistance(s, f, LR):
+    ''' Return the distance from the focal point to lens
+        Note: no focusing if s > f
+        s: Distance from source to lens
+        f: Lens focal length (refer LensFocalLength function)
+        LR: Raileigh Lengh (refer RayleighRange function)
+    '''
+    if f < s:
+        return f + (s - f) / ((s/f - 1)**2 + (LR/f)**2)
+    else:
+        raise Warning(f'Source distance (s) > focal length (f): Beam will NOT be focused.')
+        return np.Inf
+
+def LensFocalSigma(s, f, LR, sigma0):
+    ''' Return the focal size
+        Note: no focusing if s > f
+        s: Distance from source to lens
+        f: Lens focal length (refer LensFocalLength function)
+        LR: Raileigh Lengh (refer RayleighRange function)
+        sigma0: source sigma; half of waist (sigma0 = w0/2)
+    '''
+    if f < s:
+        return sigma0 * np.sqrt((1 - s/f)**2 + (LR/f)**2)
+    else:
+        raise Exception(f'Source distance (s) > focal length (f): Beam will NOT be focused.')
 
 class GaussianBeam:
     def __init__(self, keV, w0):
@@ -1312,14 +1336,14 @@ class GaussianBeam:
         '''
         self.keV = keV
         self.w0 = w0
-        zR = RayleighRange(keV, w0)
+        zR = RayleighLength(keV, w0)
         self.lamda = keV2lamda(keV)
         self.q0 = zR * 1j
         self.q = self.q0
         self.propogation = []
 
     ## Transport functions
-    def FreeSpace(self, d):
+    def _addFreeSpace(self, d):
         ''' Transport in free space (n=1)
             d: transport distance in m
         '''
@@ -1329,7 +1353,7 @@ class GaussianBeam:
         self.w = self.getw()
         self.rms = self.w / 2
 
-    def ThinLens(self, f):
+    def addThinLens(self, f):
         ''' Transport through a think lens
             f: focal length in m
         '''
@@ -1348,11 +1372,16 @@ class GaussianBeam:
         # else:
         return 1 / (1/self.q).real
 
-    def getw(self):
+    def getW(self):
         ''' Get the waist in um
         '''
         im = (1/self.q).imag
         return np.sqrt(-self.lamda / (np.pi * im)) * 1e6
+
+    def getSigma(self):
+        ''' Get the sigma of beam: sigma = waist * 0.5
+        '''
+        return self.getW() * 0.5
 
     def print(self):
         ''' Print beam information
@@ -1370,11 +1399,13 @@ class GaussianBeam:
 
     def reset(nstep=0):
         ''' Reset '''
-        return
+        pass
 
 """ Define units and constants
     - Muliply to convert from SI unit to the target unit:
         e.g. a*u['cm'] to get from m to cm
+    - Devide to covert from the indicated unit to SI unit
+        e.g. a/u['cm'] to get from cm to m
 """
 u = {'fm': 1e15,
      'pm': 1e12,

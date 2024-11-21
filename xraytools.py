@@ -41,7 +41,7 @@ def goodID(matID, item=None):
 
         try:
             _ = xl.CompoundParser(id)
-        except:
+        except:  # noqa: E722
             print('Cannot find ' + matID + ' in xraylib')
             good = False
    
@@ -73,14 +73,14 @@ def lam(E):
     """
     return (12398.4/E)*1e-10
 
-def lam2E(l):
+def lam2E(l):  # noqa: E741
     """ Computes photon energy in eV
         l is photon wavelength in m
     """
     E=12398.4/(l*u['ang'])
     return E
 
-def lam2f(l):
+def lam2f(l):  # noqa: E741
     """ Computes the photon frequency in Hz
         l is photon wavelength in m
     """
@@ -91,7 +91,7 @@ def f2lam(f):
     """ Computes the photon wavelength in m
         f is the photon frequency in Hz
     """
-    l=c['c']/f
+    l=c['c']/f  # noqa: E741
     return l
  
 def f2E(f):
@@ -178,7 +178,7 @@ def mu(matID, keV, density=None):
           density in g/cm3, None=default density
     """
     mat = goodID(matID)
-    if density == None:
+    if density is None:
         density = defaultDensity(matID)
     if np.isscalar(keV):
         energies = np.array([keV], dtype=np.double)
@@ -198,7 +198,7 @@ def mu_en(matID, keV, density=None):
           density in g/cm3, None=default density
     """
     mat = goodID(matID)
-    if density == None:
+    if density is None:
         density = defaultDensity(matID)
     if np.isscalar(keV):
         energies = np.array([keV], dtype=np.double)
@@ -236,7 +236,7 @@ def eVatom(matID, keV, mJ, rms_mm, density=None):
              -- E, mJ, rms_mm must match if more than one are vectorized
           density: in g/cm3, None=default density
     """
-    if density == None:
+    if density is None:
         density = defaultDensity(matID)
     attL = attenuationLength(matID, keV, density)
     EdensityJcm3 = mJ/1000 / (2 * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
@@ -253,7 +253,7 @@ def eVatom_en(matID, keV, mJ, rms_mm, density=None):
              -- E, mJ, rms_mm must match if more than one are vectorized
           density: in g/cm3, None=default density
     """
-    if density == None:
+    if density is None:
         density = defaultDensity(matID)
     attL = 1.0 / mu_en(matID, keV, density)
     EdensityJcm3 = mJ/1000 / (2 * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
@@ -372,7 +372,7 @@ def pulseT(matID, keV, mJ, rms_mm, density=None, baseT=298.15):
         * density: in g/cm3, None=default density
         * baseT: base temperature (K), 298 K in default
     """
-    if density == None:
+    if density is None:
         density = defaultDensity(matID)
     attL = attenuationLength(matID, keV, density)
     EdensityJcm3 = mJ / 1000. / (2. * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
@@ -577,10 +577,14 @@ def plot(x, y, xlabel=None, ylabel=None, title=None, figsize=(4.5,3), logx=False
     '''
     plt.figure(figsize=figsize, dpi=100, facecolor='white')
     
-    if not logx and not logy:   plt.plot(x, y)
-    if not logx and logy:       plt.semilogy(x, y)
-    if logx and not logy:       plt.semilogx(x, y)
-    if logx and logy:           plt.loglog(x, y)
+    if not logx and not logy:
+        plt.plot(x, y)
+    if not logx and logy:
+        plt.semilogy(x, y)
+    if logx and not logy:
+        plt.semilogx(x, y)
+    if logx and logy:
+        plt.loglog(x, y)
 
     if xmin is not None:
         plt.xlim(left=xmin)
@@ -595,14 +599,18 @@ def plot(x, y, xlabel=None, ylabel=None, title=None, figsize=(4.5,3), logx=False
     if ymin is not None:
         plt.ylim(bottom=ymin)
     else:
-        if not logy:  plt.ylim(bottom=0)
+        if not logy:
+            plt.ylim(bottom=0)
 
     if ymax is not None:
         plt.ylim(top=ymax)
 
-    if title is not None:  plt.title(title, fontsize=11)
-    if xlabel is not None: plt.xlabel(xlabel)
-    if ylabel is not None: plt.ylabel(ylabel)
+    if title is not None:
+        plt.title(title, fontsize=11)
+    if xlabel is not None:
+        plt.xlabel(xlabel)
+    if ylabel is not None:
+        plt.ylabel(ylabel)
 
     plt.grid(True)
     plt.tight_layout()
@@ -869,7 +877,7 @@ def dSpace(ID,hkl):
     ID = goodID(ID)
     h=hkl[0]
     k=hkl[1]
-    l=hkl[2]
+    l=hkl[2]  # noqa: E741
 
     lp=latticeParameters[ID]
     a=lp[0]/u['ang']
@@ -913,7 +921,7 @@ def BraggEnergy(ID,hkl,twotheta):
     """
     ID=goodID(ID)
     d=dSpace(ID,hkl)
-    l=2*d*sind(twotheta/2.0)
+    l=2*d*sind(twotheta/2.0)  # noqa: E741
     E=lam2E(l)
     return E
 
@@ -929,7 +937,7 @@ def StructureFactor(ID,f,hkl,z=None):
     i=complex(0,1)
     h=hkl[0]
     k=hkl[1]
-    l=hkl[2]
+    l=hkl[2]  # noqa: E741
     L=latticeType[ID]
     if L=='fcc':
       F=f*(1+np.exp(-i*np.pi*(k+l))+np.exp(-i*np.pi*(h+l))+np.exp(-i*np.pi*(h+k)))
@@ -971,7 +979,7 @@ def UnitCellVolume(ID):
     alpha=lp[3]
     beta=lp[4]
     gamma=lp[5]
-    L=latticeType[ID]
+    # L=latticeType[ID]
     ca=cosd(alpha)
     cb=cosd(beta)
     cg=cosd(gamma)
@@ -1010,7 +1018,7 @@ def DarwinWidth(ID, hkl, E, T=293):
     ID = goodID(ID)
     E = eV(E)
     theta = BraggAngle(ID,hkl,E)
-    l = lam(E)
+    l = lam(E)  # noqa: E741
     f = FF(ID,2*theta,E)
     F = StructureFactor(ID,f,hkl)
     V = UnitCellVolume(ID)
@@ -1283,13 +1291,13 @@ def lamda2keV(lamda_nm):
     return 1239.8 / lamda_nm * 0.001
 
 ## Gaussian beam propogation
-def RayleighLength(keV, w0, n=1):
+def RayleighLength(keV, w0_um, n=1):
     ''' Return the Rayleigh range in m (SI unit)
        keV: photon energy in keV
        w0:  waist size in um
        n:   refractive index of the medium (default 1 for vacuum)
     '''
-    return np.pi * (w0*1e-6)**2 * n / keV2lamda(keV)
+    return np.pi * (w0_um*1e-6)**2 * n / keV2lamda(keV)
 
 def LensFocalLength(keV, radius_um, matID='Be'):
     ''' Return the focal length of a lens in m
@@ -1311,7 +1319,7 @@ def LensFocalDistance(s, f, LR):
     if f < s:
         return f + (s - f) / ((s/f - 1)**2 + (LR/f)**2)
     else:
-        raise Warning(f'Source distance (s) > focal length (f): Beam will NOT be focused.')
+        raise Warning(f'Source distance ({s}) > focal length ({f}): Beam will NOT be focused.')
         return np.Inf
 
 def LensFocalSigma(s, f, LR, sigma0):
@@ -1323,34 +1331,99 @@ def LensFocalSigma(s, f, LR, sigma0):
         sigma0: source sigma; half of waist (sigma0 = w0/2)
     '''
     if f < s:
-        return sigma0 * np.sqrt((1 - s/f)**2 + (LR/f)**2)
+        return sigma0 / np.sqrt((1 - s/f)**2 + (LR/f)**2)
     else:
-        raise Exception(f'Source distance (s) > focal length (f): Beam will NOT be focused.')
+        raise Exception(f'Source distance ({s}) > focal length ({f}): Beam will NOT be focused.')
+
+
+def initGaussianBeam(keV, w0_um):
+    """_summary_
+
+    Args:
+        keV (float, array_like): keV
+        w0_um (float, array_like): waist size in um
+    
+    Returns:
+        complex, array_like: q of Gaussian beam
+    """    
+    zR = RayleighLength(keV, w0_um)
+    return zR * 1j
+
+def propogateFreeSpace(q_in, d_m):
+    """ free space propogation
+
+    Args:
+        q_in (complex, array_like): input Gaussian Beam, SI unit
+        d_m (float, array_like): free space lengh in meters
+
+    Returns:
+        q_out (complex, array_like): q out
+    """
+    return q_in + d_m
+
+def propogateThinLens(q_in, f_m):
+    """ thin lens propogation
+
+    Args:
+        q_in (complex, array_like): input Gaussian Beam, SI unit
+        f_m (float, array_like): lens focal length in meters
+
+    Returns:
+        q_out (complex, array_like): q out
+    """
+    return 1 / (1/q_in - 1/f_m)
+
+def getGaussianWaist(q, keV):
+    """ get waist size in um of q
+
+    Args:
+        q (complex, array_like): complex Gaussian beam
+        keV (float, array_like): keV
+
+    Returns:
+        waist_um (float, array_like): waist size in um
+    """
+    im = (1/q).imag
+    lamda = keV2lamda(keV)
+    return np.sqrt(-lamda / (np.pi * im)) * 1e6
+
+def getGaussianSigma(q, keV):
+    """ get sigma in um of q
+
+    Args:
+        q (complex, array_like): complex Gaussian beam
+        keV (float, array_like): keV
+
+    Returns:
+        sigma_um (float, array_like): waist size in um
+    """
+    return getGaussianWaist(q, keV) / 2
+
 
 class GaussianBeam:
-    def __init__(self, keV, w0):
+    def __init__(self, keV, w0_um):
         ''' Initialize a Gaussian beam
             keV: photon energy
             z0:  waist location in m
-            w0:  waist size in um, use diameter not radius
+            w0:  waist size in um
         '''
         self.keV = keV
-        self.w0 = w0
-        zR = RayleighLength(keV, w0)
+        self.w0 = w0_um
+        zR = RayleighLength(keV, w0_um)
         self.lamda = keV2lamda(keV)
         self.q0 = zR * 1j
         self.q = self.q0
         self.propogation = []
 
     ## Transport functions
-    def _addFreeSpace(self, d):
+    def addFreeSpace(self, d):
         ''' Transport in free space (n=1)
             d: transport distance in m
         '''
         self.propogation.append(("Free Space", d))
         self.q = self.q + d
         self.R = self.getR()
-        self.w = self.getw()
+        self.w = self.getWaist()
         self.rms = self.w / 2
 
     def addThinLens(self, f):
@@ -1360,7 +1433,7 @@ class GaussianBeam:
         self.propogation.append(("Thin Lens", f))
         self.q = 1 / (1/self.q - 1/f)
         self.R = self.getR()
-        self.w = self.getw()
+        self.w = self.getWaist()
         self.rms = self.w / 2
 
     ## Get beam information
@@ -1372,16 +1445,16 @@ class GaussianBeam:
         # else:
         return 1 / (1/self.q).real
 
-    def getW(self):
+    def getWaist(self):
         ''' Get the waist in um
         '''
         im = (1/self.q).imag
         return np.sqrt(-self.lamda / (np.pi * im)) * 1e6
 
     def getSigma(self):
-        ''' Get the sigma of beam: sigma = waist * 0.5
+        ''' Get the sigma of beam: sigma = waist / 2
         '''
-        return self.getW() * 0.5
+        return self.getWaist() / 2
 
     def print(self):
         ''' Print beam information

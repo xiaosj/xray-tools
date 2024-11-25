@@ -1290,14 +1290,15 @@ def lamda2keV(lamda_nm):
     '''
     return 1239.8 / lamda_nm * 0.001
 
+
 ## Gaussian beam propogation
-def RayleighLength(keV, w0_um, n=1):
+def RayleighLength(keV, sigma0_um, n=1):
     ''' Return the Rayleigh range in m (SI unit)
        keV: photon energy in keV
-       w0:  waist size in um
-       n:   refractive index of the medium (default 1 for vacuum)
+       sigma0_um: sigma in um
+       n:   refractive index of the medium (default 1 for vacuum). Not tested for non-vacuum yet.
     '''
-    return np.pi * (w0_um*1e-6)**2 * n / keV2lamda(keV)
+    return 4 * np.pi * (sigma0_um*1e-6)**2 * n / keV2lamda(keV)
 
 def LensFocalLength(keV, radius_um, matID='Be'):
     ''' Return the focal length of a lens in m
@@ -1336,20 +1337,20 @@ def LensFocalSigma(s, f, LR, sigma0):
         raise Exception(f'Source distance ({s}) > focal length ({f}): Beam will NOT be focused.')
 
 
-def initGaussianBeam(keV, w0_um):
+def initGaussianBeam(keV, sigma0_um, M_square=1.0):
     """_summary_
 
     Args:
         keV (float, array_like): keV
-        w0_um (float, array_like): waist size in um
-    
+        sigma0_um (float, array_like): sigma in um
+        M_square(float, array_like): M^2. Default to 1.
     Returns:
         complex, array_like: q of Gaussian beam
     """    
-    zR = RayleighLength(keV, w0_um)
-    return zR * 1j
+    zR = RayleighLength(keV, sigma0_um)
+    return zR / M_square * 1j
 
-def propogateFreeSpace(q_in, d_m):
+def propagateFreeSpace(q_in, d_m):
     """ free space propogation
 
     Args:
@@ -1361,7 +1362,7 @@ def propogateFreeSpace(q_in, d_m):
     """
     return q_in + d_m
 
-def propogateThinLens(q_in, f_m):
+def propagateThinLens(q_in, f_m):
     """ thin lens propogation
 
     Args:
@@ -1373,45 +1374,38 @@ def propogateThinLens(q_in, f_m):
     """
     return 1 / (1/q_in - 1/f_m)
 
-def getGaussianWaist(q, keV):
-    """ get waist size in um of q
 
-    Args:
-        q (complex, array_like): complex Gaussian beam
-        keV (float, array_like): keV
-
-    Returns:
-        waist_um (float, array_like): waist size in um
-    """
-    im = (1/q).imag
-    lamda = keV2lamda(keV)
-    return np.sqrt(-lamda / (np.pi * im)) * 1e6
-
-def getGaussianSigma(q, keV):
+def getGaussianSigma_um(q, keV, M_square=1.0):
     """ get sigma in um of q
 
     Args:
         q (complex, array_like): complex Gaussian beam
         keV (float, array_like): keV
+        M_square (float, array_like): M^2, beam quality factor. Default to 1.
 
     Returns:
-        sigma_um (float, array_like): waist size in um
+        sigma_um (float, array_like): sigma size in um
     """
-    return getGaussianWaist(q, keV) / 2
+    im = (1/q).imag
+    lamda = keV2lamda(keV)
+    return np.sqrt(-M_square * lamda / (4 * np.pi * im)) * 1e6
 
 
 class GaussianBeam:
-    def __init__(self, keV, w0_um):
+    def __init__(self, keV, sigma0_um, M_square=1.0):
         ''' Initialize a Gaussian beam
             keV: photon energy
             z0:  waist location in m
-            w0:  waist size in um
+            sigma0:  sigma size in um
+            M_square: beam quality factor, default to 1
         '''
         self.keV = keV
-        self.w0 = w0_um
-        zR = RayleighLength(keV, w0_um)
+        self.sigma = sigma0_um
+        self.M2 = M_square
+        self.w = self.sigma * 2
+        zR = RayleighLength(keV, sigma0_um)
         self.lamda = keV2lamda(keV)
-        self.q0 = zR * 1j
+        self.q0 = zR / M_square * 1j
         self.q = self.q0
         self.propogation = []
 
@@ -1422,9 +1416,9 @@ class GaussianBeam:
         '''
         self.propogation.append(("Free Space", d))
         self.q = self.q + d
-        self.R = self.getR()
-        self.w = self.getWaist()
-        self.rms = self.w / 2
+        self.R = self.getR_m()
+        self.w = self.getWaist_um()
+        self.sigma = self.w / 2
 
     def addThinLens(self, f):
         ''' Transport through a think lens
@@ -1432,12 +1426,12 @@ class GaussianBeam:
         '''
         self.propogation.append(("Thin Lens", f))
         self.q = 1 / (1/self.q - 1/f)
-        self.R = self.getR()
-        self.w = self.getWaist()
-        self.rms = self.w / 2
+        self.R = self.getR_m()
+        self.w = self.getWaist_um()
+        self.sigma = self.w / 2
 
     ## Get beam information
-    def getR(self):
+    def getR_m(self):
         ''' Get the radius of curvature in m (positive for diverging, negative for convergin)
         '''
         # if self.q.real == 0:
@@ -1445,21 +1439,21 @@ class GaussianBeam:
         # else:
         return 1 / (1/self.q).real
 
-    def getWaist(self):
+    def getWaist_um(self):
         ''' Get the waist in um
         '''
         im = (1/self.q).imag
-        return np.sqrt(-self.lamda / (np.pi * im)) * 1e6
+        return np.sqrt(-self.M2 * self.lamda / (np.pi * im)) * 1e6
 
-    def getSigma(self):
+    def getSigma_um(self):
         ''' Get the sigma of beam: sigma = waist / 2
         '''
-        return self.getWaist() / 2
+        return self.getWaist_um() / 2
 
     def print(self):
         ''' Print beam information
         '''
-        print(f'{self.keV} keV, {self.w0} um waist:')
+        print(f'{self.keV} keV, {self.sigma0} um waist:')
         print('Propogation List:')
         for i in range(len(self.propogation)):
             if self.propogation[i][0] == "Free Space":
@@ -1468,7 +1462,7 @@ class GaussianBeam:
                 print(f'  {i+1}. Thin Lens with {self.propogation[i][1]} m focal length')
         print(f'Complex beam parameter q = {self.q}')
         print(f'Radius of curvature R = {self.R} m')
-        print(f'Beam waist = {self.w} um, rms = {self.rms} um')
+        print(f'Beam waist = {self.w} um, rms = {self.sigma} um')
 
     def reset(nstep=0):
         ''' Reset '''

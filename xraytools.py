@@ -322,7 +322,8 @@ def drillSpeed(matID, power_W, FWHM_mm):
         'Fe': 49.62 + 13.81 + 60.89 + 340,
         'W' :119.39 + 52.31 + 89.19 + 774,
         'Mo':  89.9 + 37.5  + 71.9  + 598,
-        'Al': 17.97 + 10.71 + 59.06 + 284
+        'Al': 17.97 + 10.71 + 59.06 + 284,
+        'C':  86.00 +                 715  # Graphite, sublimation from 3900 K at normal pressure (no melting), https://en.wikipedia.org/wiki/Heats_of_vaporization_of_the_elements_(data_page)
     }
     if matID not in vaporH.keys():
         raise ValueError(f'No vaporization data for {matID}: available in {vaporH.keys()}')
@@ -874,7 +875,7 @@ def dSpace(ID,hkl):
         ID is chemical fomula : 'Si'
         hkl is the reflection : (1,1,1)
     """
-    ID = goodID(ID)
+    ID = goodID(ID, item='crystal')
     h=hkl[0]
     k=hkl[1]
     l=hkl[2]  # noqa: E741
@@ -933,7 +934,7 @@ def StructureFactor(ID,f,hkl,z=None):
         hkl is the reflection : (1,1,1)
         z is the rhombohedral lattice parameter
     """
-    ID=goodID(ID)
+    ID=goodID(ID, item='crystal')
     i=complex(0,1)
     h=hkl[0]
     k=hkl[1]
@@ -960,7 +961,7 @@ def StructureFactor(ID,f,hkl,z=None):
 
 
 def StructureFactorE(ID,hkl,E=None,z=None):
-    ID=goodID(ID)
+    ID=goodID(ID, item='crystal')
     # E = getE(E)
     theta=BraggAngle(ID,hkl,E)
     f=FF(ID,2*theta,E)
@@ -1015,7 +1016,7 @@ def DarwinWidth(ID, hkl, E, T=293):
         E is photon energy in eV or keV
         T is the crystal temperature in Kelvin (default is 293)
     """
-    ID = goodID(ID)
+    ID = goodID(ID, item='crystal')
     E = eV(E)
     theta = BraggAngle(ID,hkl,E)
     l = lam(E)  # noqa: E741
@@ -1085,6 +1086,12 @@ def MomentumTransfer(E,twotheta):
   th = np.deg2rad(twotheta)
   p = xl.MomentTransf(E, th)
   return p
+
+
+def hkl2str(hkl):
+    ''' Transfer hkl index to string
+    '''
+    return f'({hkl[0]},{hkl[1]},{hkl[2]})'
 
 
 def loglog_negy_interp1d(x, y, xx):
@@ -2506,7 +2513,8 @@ latticeType = {'H' :'hcp',
      'LaAlO3':'rhomb',
      'La0.7Sr0.3MnO3':'rhomb',
      'GGG':'cubic',
-     'YAG':'cubic'
+     'YAG':'cubic',
+     'Y3Al5O12':'cubic'
 }
 
 
@@ -2601,7 +2609,8 @@ latticeParameters = {
      'LaAlO3':(5.377,5.377,5.377,60.13,60.13,60.13),
      'La0.7Sr0.3MnO3':(5.4738,5.4738,5.4738,60.45,60.45,60.45),
      'Gd3Ga5O12':(12.383,12.383,12.383,90,90,90),
-     'YAG':(12.006,12.006,12.006,90,90,90)  # from https://x-server.gmca.aps.anl.gov/cgi/www_form.exe?template=x0h_form.htm
+     'YAG':(12.006,12.006,12.006,90,90,90),  # from https://x-server.gmca.aps.anl.gov/cgi/www_form.exe?template=x0h_form.htm
+     'Y3Al5O12':(12.006,12.006,12.006,90,90,90)
 }
 
  
@@ -2667,6 +2676,7 @@ specificHeatParams = {
     'TaC':(44.29224,7.673707,-0.091309,0.010861,-0.875548),
     'TiB2':(52.33264,33.69484,-7.909266,0.803989,-1.540905),
     'YAG':(376,0,0,0,0),
+    'Y3Al5O12':(376,0,0,0,0),
     'ZnO':(40.2,0,0,0,0),
     'CaSiO5':(111,0,0,0,0),
     'H2O':(75.327,0,0,0,0),
@@ -2684,12 +2694,19 @@ specificHeat = {
     'CVD': np.array([[50, 100, 150, 200, 250, 298, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000],
                      [0.052335, 0.20850264, 1.00022652, 2.3801958, 4.15456164, 6.07797756, 6.16045752, 8.21575764, 10.17643608, 11.96252496, 13.544298, 14.92217388, 16.11206244, 17.1365724, 18.01831248, 18.77821668, 19.43470692, 20.00411172, 20.50024752, 20.93358132, 21.31416144, 21.6499428, 22.44627216, 22.8452742, 23.1697512, 23.43603168, 23.6575134, 23.99999364, 24.24952692, 24.43667688, 24.58028412, 24.69290904, 24.78292524, 24.82521192],
                      [0.00, 6.52, 36.74, 121.25, 284.62, 530.20, 542.44, 901.84, 1361.65, 1915.12, 2552.79, 3264.45, 4040.31, 4871.53, 5750.40, 6670.31, 7625.63, 8611.61, 9624.21, 10660.06, 11716.25, 13864.46, 16069.27, 18333.85, 20634.60, 22964.89, 25319.56, 30085.32, 34910.27, 39778.89, 44680.58, 49607.90, 54555.49, 59516.30]
-                    ])
+                    ]),
+    # Graphite: https://webbook.nist.gov/cgi/cbook.cgi?ID=C7782425&Units=SI&Mask=2#Thermo-Condensed
+    # T = 200 to 3500 K. Least squares fit of 'best' data gives: Cp = 0.538657 + 9.11129x10-6*T - 90.2725*T^-1 - 43449.3*T^-2 + 1.59309x10^7*T^-3 - 1.43688x10^9*T^-4 cal/g*K (250 to 3000 K)
+    'Graphite': np.array([[300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 3900],
+                          [8.55, 10.30, 11.94, 13.42, 14.73, 15.86, 16.85, 17.71, 18.47, 19.13, 19.72, 20.25, 20.71, 21.14, 21.52, 22.18, 22.73, 23.20, 23.61, 23.96, 24.28, 24.81, 25.24, 25.61, 25.93, 26.21, 26.46, 26.69, 26.90, 27.10, 27.28, 27.45, 27.54],
+                          [0, 471, 1028, 1663, 2367, 3133, 3951, 4816, 5721, 6661, 7633, 8633, 9657, 10703, 11770, 13955, 16201, 18499, 20839, 23218, 25631, 30541, 35547, 40634, 45789, 51004, 56272, 61588, 66948, 72348, 77786, 83260, 86009]
+                         ])
 }
 
 # Latent heat in kJ/mol
 # (Heat of Fusion, Heat of Vaporization)
+# Heat of Vaporization: https://en.wikipedia.org/wiki/Enthalpy_of_vaporization
 latentHeat = {
      'Fe':(13.81, 340),
-    'H2O':(4.0)
+    'H2O':(6.009, 40.66)
 }

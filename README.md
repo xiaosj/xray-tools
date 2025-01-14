@@ -3,7 +3,7 @@ Set of tools for x-ray analysis.
 
 ## xraytools.py
 Various tools for x-ray calculations
-* Dependency: [xraylib](https://github.com/tschoonj/xraylib), numpy, scipy, matplotlib.
+* Dependency: [xraylib](https://github.com/tschoonj/xraylib), numpy, scipy, matplotlib, requests.
     * Maybe easier to install xraylib via Anaconda, see below or more in [the page](https://anaconda.org/conda-forge/xraylib):
       ```
       conda install conda-forge::xraylib

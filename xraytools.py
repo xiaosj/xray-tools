@@ -7,6 +7,7 @@ from scipy.special import dawsn, expi
 import matplotlib.pyplot as plt
 from matplotlib.ticker import ScalarFormatter
 import xraylib as xl
+import requests
 
 
 def goodID(matID, item=None):
@@ -1092,6 +1093,159 @@ def hkl2str(hkl):
     ''' Transfer hkl index to string
     '''
     return f'({hkl[0]},{hkl[1]},{hkl[2]})'
+
+
+def getX0h(matID, keV, hkl):
+    """ Get the Bragg reflection for a given material, photon energy and Bragg plane.
+        
+        This function uses the X0h database from the X0h CGI interface of the X-ray server at the Advanced Photon Source (APS) at Argonne National Laboratory (ANL).
+        https://x-server.gmca.aps.anl.gov/cgi/www_form.exe?template=x0h_form.htm
+
+    Args:
+        matID (String): Material ID. Available materials are listed in the function.
+        keV (float): Photon energy in keV
+        hkl (tuple, int): Bragg plane (h, k, l)
+
+    Returns:
+        Response object: returns the Response object from the request.
+    """
+    url = 'https://x-server.gmca.aps.anl.gov/cgi/x0h_form.exe'
+
+    matID_list = ['ADP', 'AlAs', 'AlFe3', 'AlN', 'AlP', 'AlSb', 'Aluminium', 'Ba2ScRuO6', 'BaSnO3', 'BaTiO3', 'Beril', 'Beryllium', 'Bi12GeO20', 'BiFeO3', 'Bismuth-fcc', 'Bismuth-primitive', 'Black_Phosphorus', 'C8H5KO4', 'C9H10N2', 'Ca2RuO4_HiTemp', 'Ca2RuO4_LoTemp', 'CaCO3_R3c', 'CaMnO3', 'CaRuO3', 'CdS', 'CdSe', 'CdTe', 'CeO2', 'Co2FeSi', 'Co2TiSi', 'CoAs', 'Copper', 'CoPS3_250K', 'Cr2AlC', 'CsCl', 'CsDSO4', 'CsF', 'CsH2PO4', 'Cu2ZnSnSe4', 'Cu3Au', 'Diamond', 'DyScO3', 'Fe-alpha', 'Fe2As', 'Fe2Mo3O8', 'Fe3O4', 'Fe3Si', 'FeBO3', 'FeGe2-alpha', 'FePS3', 'FeRh', 'FeSi', 'FeTiO3', 'Forsterite', 'Ga2O3-alpha', 'Ga2O3-beta', 'Ga2O3-gamma', 'Ga2O3-kappa', 'GaAs', 'GaN', 'GaN_cubic', 'GaP', 'GaSb', 'Gd2O3', 'Gd3Ga5O12', 'Gd3Sc2Ga3O12', 'GdSb', 'GdScO3', 'GeFe_primitive', 'Germanium', 'Ge_primitive', 'Gold', 'Graphite', 'HfO2', 'HgS', 'HgSe', 'HgTe', 'InAs', 'InGaAs', 'InN', 'InP', 'InSb', 'Iron-bcc', 'KAP', 'KCl', 'KDP', 'KTiOPO4', 'La(.5)Sr(1.5)MnO4', 'La(.7)Sr(.3)MnO3', 'La2CuO4_tetragonal', 'La2O3cub', 'La2O3hex', 'LaAlO3', 'LaCuO3', 'LaFeO3', 'LaInO3', 'LaMnO3', 'Langasite', 'LaNiO2', 'LaNiO3', 'LaNiO3_cubic', 'Lead', 'Li0.5Fe2.5O4_solutn', 'Li0.5Fe2.5O4_stchmtr', 'Li2B4O7', 'LiF', 'LiH', 'LiNbO3', 'LiTaO3', 'LSAT_cubic', 'LSAT_tetragonal', 'Lu2O3cub', 'LuPtBi', 'Magnetite', 'MgAl2O4', 'MgO', 'Mica', 'MnAs', 'Molybdenite', 'NaCl', 'NaOsO3', 'NbO2', 'NdGaO3', 'NdScO3', 'Nickel', 'Paratellurite', 'PbMg.24Nb.47Ti.29O3', 'PbMg.24Nb.48Ti.28O3r', 'PbMg.25Nb.49Ti.26O3h', 'PbMoO4', 'PbSe', 'PbTe', 'PbTiO3', 'PbWO4', 'PbZrO3', 'Pentaerythritol', 'Platinum', 'Pr2O3', 'PZT_PbZr.52Ti.48O3', 'Quartz', 'RuO2', 'Rutile', 'Sapphire_hex', 'Sapphire_rhomb', 'Sc2O3', 'Si-primitive', 'SiC-3c', 'SiC-4H', 'SiC-6H', 'SiFe-primitive', 'Silicon', 'Silver', 'SmNiO3', 'Sn2P2Se6', 'SnO2_Cassiterite', 'Sr2IrO4', 'Sr2TiO4', 'Sr3Al2O6', 'Sr3Ti2O7', 'Sr4Ti3O10', 'SrRuO3', 'SrTiO3', 'SrTiO3_tetragonal', 'SrVO3', 'Tantalum', 'Tellurium-I', 'Triglycine sulfate', 'Tungsten', 'Tungsten Disulfide', 'UO2', 'VO2_Rutile', 'Y3Al5O12', 'YAlO3', 'Zincite', 'Zn3P2', 'ZnS', 'ZnSe', 'ZnTe', 'ZrO2']
+    matID_alias = {
+        'Si': 'Silicon',
+        'YAG': 'Y3Al5O12',
+        'Ge': 'Germanium'
+    }
+    if matID in matID_alias:
+        matID = matID_alias[matID]
+    if matID not in matID_list:
+        raise ValueError(f"Material ID {matID} not found in the list of available materials.")
+    
+    # Parameters of X0h CGI interface
+    # Example from X0h search: https://x-server.gmca.aps.anl.gov/cgi/x0h_form.exe?#xway=2&wave=10&coway=0&code=Silicon&i1=2&i2=2&i3=0&df1df2=-1&modeout=1
+    xway = 2    # 2 - keV
+    wave = keV
+    coway = 0
+    code = matID
+    i1, i2, i3 = hkl[0], hkl[1], hkl[2]
+    df1df2 = -1  # automatic database selection
+    modeout = 1  # text output (no table)
+
+    # Building address
+    params = {
+        'xway': xway,
+        'wave': wave,
+        'coway': coway,
+        'code': code,
+        'i1': i1,
+        'i2': i2,
+        'i3': i3,
+        'df1df2': df1df2,
+        'modeout': modeout
+    }
+    
+    # Connect & Download
+    response = requests.get(url, params=params)
+
+    # Example to read the data
+    # content = response.text
+    # FWHMurad_sg: Darwin width (FWHM) in micro-radians for sigma polarization
+    # DarwinWidth = float(content.split('FWHMurad_sg= ')[1].strip().split(' ')[0]) * 1e-6
+    # prcnsg: relative diffraction intensity for sigma polarization
+    # xh_x0 = float(content.split('prcnsg= ')[1].strip().split(' ')[0]) * 0.01
+
+    return response
+
+
+def getX0h_plane(matID, keV, hkl_min, hkl_max, qb1=0., qb2=90., prcmin=0.1, df1df2=-1, hkl_base=(1,1,1), q1=0., q2=180.):
+    """ Get the relative diffraction intensity of a Bragg reflection for a given material and photon energy.
+        This function scans hkl planes in the range of hkl_min to hkl_max.
+        "prcmin" must be > 0 to generate results for the relative diffraction intensity.
+        
+        This function uses the X0h database from the X0h CGI interface of the X-ray server at the Advanced Photon Source (APS) at Argonne National Laboratory (ANL).
+        https://x-server.gmca.aps.anl.gov/cgi/www_form.exe?template=x0p_form.htm
+
+    Args:
+        matID (String): Material ID. Available materials are listed in the function.
+        keV (float): Photon energy in keV
+        hkl_min (tuple, int): Bragg plane range: minimum.
+        hkl_max (tuple, int): Bragg plane range: maximum.
+        qb1 (float, optional): Bragg angle range: minimum. Defaults to 0.
+        qb2 (float, optional): Bragg angle range: maximum. Defaults to 90.
+        prcmin (float, optional): Report threashold in percent. Must be > 0. Report when xh/x0 is greater than the given value. Defaults to 0.1
+        df1df2 (int, optional): Database for dispersion corrections. Defaults to -1 (auto select).
+        hkl_base (tuple, int, optional): Bragg plane of surface. Defaults to (1,0,0).
+        q1 (float, optional): Plans make angle Theta1. Defaults to 0.
+        q2 (float, optional): Plans make angle Theta2. Defaults to 180.
+
+    Returns:
+        Response object: returns the Response object from the request.
+        Data have 4 columns: 'hkl' in the format of (h k l), 'Angle to surface', 'Bragg angle' and 'Relative Intensity xh/x0(%)'
+    """
+    url = 'https://x-server.gmca.aps.anl.gov/cgi/x0p_form.exe'
+    
+    matID_list = ['ADP', 'AlAs', 'AlFe3', 'AlN', 'AlP', 'AlSb', 'Aluminium', 'Ba2ScRuO6', 'BaSnO3', 'BaTiO3', 'Beril', 'Beryllium', 'Bi12GeO20', 'BiFeO3', 'Bismuth-fcc', 'Bismuth-primitive', 'Black_Phosphorus', 'C8H5KO4', 'C9H10N2', 'Ca2RuO4_HiTemp', 'Ca2RuO4_LoTemp', 'CaCO3_R3c', 'CaMnO3', 'CaRuO3', 'CdS', 'CdSe', 'CdTe', 'CeO2', 'Co2FeSi', 'Co2TiSi', 'CoAs', 'Copper', 'CoPS3_250K', 'Cr2AlC', 'CsCl', 'CsDSO4', 'CsF', 'CsH2PO4', 'Cu2ZnSnSe4', 'Cu3Au', 'Diamond', 'DyScO3', 'Fe-alpha', 'Fe2As', 'Fe2Mo3O8', 'Fe3O4', 'Fe3Si', 'FeBO3', 'FeGe2-alpha', 'FePS3', 'FeRh', 'FeSi', 'FeTiO3', 'Forsterite', 'Ga2O3-alpha', 'Ga2O3-beta', 'Ga2O3-gamma', 'Ga2O3-kappa', 'GaAs', 'GaN', 'GaN_cubic', 'GaP', 'GaSb', 'Gd2O3', 'Gd3Ga5O12', 'Gd3Sc2Ga3O12', 'GdSb', 'GdScO3', 'GeFe_primitive', 'Germanium', 'Ge_primitive', 'Gold', 'Graphite', 'HfO2', 'HgS', 'HgSe', 'HgTe', 'InAs', 'InGaAs', 'InN', 'InP', 'InSb', 'Iron-bcc', 'KAP', 'KCl', 'KDP', 'KTiOPO4', 'La(.5)Sr(1.5)MnO4', 'La(.7)Sr(.3)MnO3', 'La2CuO4_tetragonal', 'La2O3cub', 'La2O3hex', 'LaAlO3', 'LaCuO3', 'LaFeO3', 'LaInO3', 'LaMnO3', 'Langasite', 'LaNiO2', 'LaNiO3', 'LaNiO3_cubic', 'Lead', 'Li0.5Fe2.5O4_solutn', 'Li0.5Fe2.5O4_stchmtr', 'Li2B4O7', 'LiF', 'LiH', 'LiNbO3', 'LiTaO3', 'LSAT_cubic', 'LSAT_tetragonal', 'Lu2O3cub', 'LuPtBi', 'Magnetite', 'MgAl2O4', 'MgO', 'Mica', 'MnAs', 'Molybdenite', 'NaCl', 'NaOsO3', 'NbO2', 'NdGaO3', 'NdScO3', 'Nickel', 'Paratellurite', 'PbMg.24Nb.47Ti.29O3', 'PbMg.24Nb.48Ti.28O3r', 'PbMg.25Nb.49Ti.26O3h', 'PbMoO4', 'PbSe', 'PbTe', 'PbTiO3', 'PbWO4', 'PbZrO3', 'Pentaerythritol', 'Platinum', 'Pr2O3', 'PZT_PbZr.52Ti.48O3', 'Quartz', 'RuO2', 'Rutile', 'Sapphire_hex', 'Sapphire_rhomb', 'Sc2O3', 'Si-primitive', 'SiC-3c', 'SiC-4H', 'SiC-6H', 'SiFe-primitive', 'Silicon', 'Silver', 'SmNiO3', 'Sn2P2Se6', 'SnO2_Cassiterite', 'Sr2IrO4', 'Sr2TiO4', 'Sr3Al2O6', 'Sr3Ti2O7', 'Sr4Ti3O10', 'SrRuO3', 'SrTiO3', 'SrTiO3_tetragonal', 'SrVO3', 'Tantalum', 'Tellurium-I', 'Triglycine sulfate', 'Tungsten', 'Tungsten Disulfide', 'UO2', 'VO2_Rutile', 'Y3Al5O12', 'YAlO3', 'Zincite', 'Zn3P2', 'ZnS', 'ZnSe', 'ZnTe', 'ZrO2']
+    matID_alias = {
+        'Si': 'Silicon',
+        'YAG': 'Y3Al5O12',
+        'Ge': 'Germanium'
+    }
+    if matID in matID_alias:
+        matID = matID_alias[matID]
+    if matID not in matID_list:
+        raise ValueError(f"Material ID {matID} not found in the list of available materials.")
+
+    # Parameters of X0h CGI interface
+    # Example from X0h search: https://x-server.gmca.aps.anl.gov/cgi/x0p_form.exe?xway=2&wave=11&code=Y3Al5O12&hkl11=0&hkl12=0&hkl13=0&hkl21=5&hkl22=5&hkl23=5&qb1=0.&qb2=90.&prcmin=1&df1df2=-1&base1=1&base2=0&base3=0&modesearch=3&q1=0.&q2=180.
+    xway = 2    # 2 - keV
+    wave = keV
+    code = matID
+    hkl11, hkl12, hkl13 = hkl_min[0], hkl_min[1], hkl_min[2]
+    hkl21, hkl22, hkl23 = hkl_max[0], hkl_max[1], hkl_max[2]
+    base1, base2, base3 = hkl_base[0], hkl_base[1], hkl_base[2]
+    modesearch = 3
+
+    # Building address
+    params = {
+        'xway': xway,
+        'wave': wave,
+        'code': code,
+        'hkl11': hkl11,
+        'hkl12': hkl12,
+        'hkl13': hkl13,
+        'hkl21': hkl21,
+        'hkl22': hkl22,
+        'hkl23': hkl23,
+        'qb1': qb1,
+        'qb2': qb2,
+        'prcmin': prcmin,
+        'df1df2': df1df2,
+        'base1': base1,
+        'base2': base2,
+        'base3': base3,
+        'modesearch': modesearch,
+        'q1': q1,
+        'q2': q2
+    }
+
+    # Connect & Download
+    response = requests.get(url, params=params)
+
+    # Example to read the data
+    # import pandas as pd
+    # tables = pd.read_html(response.text)
+    # _df = tables[-1]  # Return 4 columns: 'hkl' in the format of string (h k l), 'Angle to surface', 'Bragg angle' and 'Relative Intensity xh/x0(%)'
+    
+    # Pick data
+    # data = df[(df['hkl'] == '(0 0 1)') & (df['keV'] == 10.0)]
+    # bragg = df['Bragg angle'].to_numpy()
+
+    # Convert string to tuple
+    # hkl = df['hkl'].str.strip('()')
+    # hkl = [tuple(map(int, x.split())) for x in hkl]
+    
+    return response
 
 
 def loglog_negy_interp1d(x, y, xx):

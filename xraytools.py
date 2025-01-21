@@ -7,6 +7,7 @@ from scipy.special import dawsn, expi
 import matplotlib.pyplot as plt
 from matplotlib.ticker import ScalarFormatter
 import xraylib as xl
+import requests
 
 
 def goodID(matID, item=None):
@@ -41,7 +42,7 @@ def goodID(matID, item=None):
 
         try:
             _ = xl.CompoundParser(id)
-        except:
+        except:  # noqa: E722
             print('Cannot find ' + matID + ' in xraylib')
             good = False
    
@@ -73,14 +74,14 @@ def lam(E):
     """
     return (12398.4/E)*1e-10
 
-def lam2E(l):
+def lam2E(l):  # noqa: E741
     """ Computes photon energy in eV
         l is photon wavelength in m
     """
     E=12398.4/(l*u['ang'])
     return E
 
-def lam2f(l):
+def lam2f(l):  # noqa: E741
     """ Computes the photon frequency in Hz
         l is photon wavelength in m
     """
@@ -91,7 +92,7 @@ def f2lam(f):
     """ Computes the photon wavelength in m
         f is the photon frequency in Hz
     """
-    l=c['c']/f
+    l=c['c']/f  # noqa: E741
     return l
  
 def f2E(f):
@@ -178,7 +179,7 @@ def mu(matID, keV, density=None):
           density in g/cm3, None=default density
     """
     mat = goodID(matID)
-    if density == None:
+    if density is None:
         density = defaultDensity(matID)
     if np.isscalar(keV):
         energies = np.array([keV], dtype=np.double)
@@ -198,7 +199,7 @@ def mu_en(matID, keV, density=None):
           density in g/cm3, None=default density
     """
     mat = goodID(matID)
-    if density == None:
+    if density is None:
         density = defaultDensity(matID)
     if np.isscalar(keV):
         energies = np.array([keV], dtype=np.double)
@@ -236,12 +237,13 @@ def eVatom(matID, keV, mJ, rms_mm, density=None):
              -- E, mJ, rms_mm must match if more than one are vectorized
           density: in g/cm3, None=default density
     """
-    if density == None:
+    if density is None:
         density = defaultDensity(matID)
     attL = attenuationLength(matID, keV, density)
     EdensityJcm3 = mJ/1000 / (2 * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
     atomVolcm3 = atomWeight(matID) / c['NA'] / density
-    return EdensityJcm3 * atomVolcm3 / 1.6e-19
+    natoms = xl.CompoundParser(matID)['nAtomsAll']
+    return EdensityJcm3 * atomVolcm3 / 1.6e-19 / natoms
 
 
 def eVatom_en(matID, keV, mJ, rms_mm, density=None):
@@ -252,12 +254,13 @@ def eVatom_en(matID, keV, mJ, rms_mm, density=None):
              -- E, mJ, rms_mm must match if more than one are vectorized
           density: in g/cm3, None=default density
     """
-    if density == None:
+    if density is None:
         density = defaultDensity(matID)
     attL = 1.0 / mu_en(matID, keV, density)
     EdensityJcm3 = mJ/1000 / (2 * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
     atomVolcm3 = atomWeight(matID) / c['NA'] / density
-    return EdensityJcm3 * atomVolcm3 / 1.6e-19
+    natoms = xl.CompoundParser(matID)['nAtomsAll']
+    return EdensityJcm3 * atomVolcm3 / 1.6e-19 / natoms
 
 
 def eVatom_keV_plot(matID, keV, mJ, rms_mm, density=None, logx=False, logy=True):
@@ -311,22 +314,23 @@ def eVatom_keV_plot(matID, keV, mJ, rms_mm, density=None, logx=False, logy=True)
         plt.show()
 
 
-def drillSpeed(matID, W, FWHM_mm):
+def drillSpeed(matID, power_W, FWHM_mm):
     """ Return the material drill speed (mm/s) based on vaporization heat """
     vaporH = {  # kJ/mol
         # spec heat from room temperature to melting + latent heat of fusion + spec heat from melting to boiling + latent heat of vaporization
         # refer https://webbook.nist.gov/chemistry/ for heat capacity, this tool also has some data in specificHeatParams
-        'Cu':  29.7 + 13.1 + 48.8 + 300,
-        'Fe':  49.5 + 13.8 + 60.9 + 340,
-        'W' : 118.4 + 46.9 + 82.5 + 824,
-        'Mo':  89.9 + 37.5 + 71.9 + 598,
-        'Al': 17.98 + 10.7 + 0.03175*1857 + 294
+        'Cu': 29.67 + 13.26 + 48.77 + 300,
+        'Fe': 49.62 + 13.81 + 60.89 + 340,
+        'W' :119.39 + 52.31 + 89.19 + 774,
+        'Mo':  89.9 + 37.5  + 71.9  + 598,
+        'Al': 17.97 + 10.71 + 59.06 + 284,
+        'C':  86.00 +                 715  # Graphite, sublimation from 3900 K at normal pressure (no melting), https://en.wikipedia.org/wiki/Heats_of_vaporization_of_the_elements_(data_page)
     }
     if matID not in vaporH.keys():
         raise ValueError(f'No vaporization data for {matID}: available in {vaporH.keys()}')
     
     mol_mmD = 2 * np.pi * (FWHM_mm/2.355)**2 / 1000 * defaultDensity(matID) / molarMass(matID)
-    return W / (mol_mmD * vaporH[matID] * 1000)
+    return power_W / (mol_mmD * vaporH[matID] * 1000)
 
 
 def drillTime(matID, thickness_mm, W, FWHM_mm):
@@ -370,7 +374,7 @@ def pulseT(matID, keV, mJ, rms_mm, density=None, baseT=298.15):
         * density: in g/cm3, None=default density
         * baseT: base temperature (K), 298 K in default
     """
-    if density == None:
+    if density is None:
         density = defaultDensity(matID)
     attL = attenuationLength(matID, keV, density)
     EdensityJcm3 = mJ / 1000. / (2. * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
@@ -415,7 +419,7 @@ def pulseT(matID, keV, mJ, rms_mm, density=None, baseT=298.15):
 
     T_Jmol = interp1d(Jmol, T, fill_value='extrapolate')  # T as function of J/mol
 
-    return T_Jmol(EdensityJmol + Jmol_base)
+    return T_Jmol(EdensityJmol + Jmol_base) - baseT
 
 
 def pulseTC(matID, keV, mJ, rms_mm, density=None, baseT=25):
@@ -427,7 +431,7 @@ def pulseTC(matID, keV, mJ, rms_mm, density=None, baseT=25):
         * density: in g/cm3, None=default density
         * baseT: base temperature (K), 298 K in default
     """
-    return K2C(pulseT(matID, keV, mJ, rms_mm, density=density, baseT=C2K(baseT)))
+    return pulseT(matID, keV, mJ, rms_mm, density=density, baseT=C2K(baseT))
 
 
 def spectrum_cut(spectrum, eVrange=(0.0, 0.0)):
@@ -570,15 +574,19 @@ def spectrum_shield(spectrum, area_cm2, matID, density=None, eVrange=(0.0,0.0), 
     return t1
 
 
-def plot(x, y, xlabel=None, ylabel=None, title=None, figsize=(4,2.8), logx=False, logy=False, xmin=None, xmax=None, ymin=None, ymax=None, savefig=None):
+def plot(x, y, xlabel=None, ylabel=None, title=None, figsize=(4.5,3), logx=False, logy=False, xmin=None, xmax=None, ymin=None, ymax=None, savefig=None):
     ''' Plot function
     '''
     plt.figure(figsize=figsize, dpi=100, facecolor='white')
     
-    if not logx and not logy:   plt.plot(x, y)
-    if not logx and logy:       plt.semilogy(x, y)
-    if logx and not logy:       plt.semilogx(x, y)
-    if logx and logy:           plt.loglog(x, y)
+    if not logx and not logy:
+        plt.plot(x, y)
+    if not logx and logy:
+        plt.semilogy(x, y)
+    if logx and not logy:
+        plt.semilogx(x, y)
+    if logx and logy:
+        plt.loglog(x, y)
 
     if xmin is not None:
         plt.xlim(left=xmin)
@@ -593,14 +601,18 @@ def plot(x, y, xlabel=None, ylabel=None, title=None, figsize=(4,2.8), logx=False
     if ymin is not None:
         plt.ylim(bottom=ymin)
     else:
-        if not logy:  plt.ylim(bottom=0)
+        if not logy:
+            plt.ylim(bottom=0)
 
     if ymax is not None:
         plt.ylim(top=ymax)
 
-    if title is not None:  plt.title(title, fontsize=11)
-    if xlabel is not None: plt.xlabel(xlabel)
-    if ylabel is not None: plt.ylabel(ylabel)
+    if title is not None:
+        plt.title(title, fontsize=11)
+    if xlabel is not None:
+        plt.xlabel(xlabel)
+    if ylabel is not None:
+        plt.ylabel(ylabel)
 
     plt.grid(True)
     plt.tight_layout()
@@ -864,10 +876,10 @@ def dSpace(ID,hkl):
         ID is chemical fomula : 'Si'
         hkl is the reflection : (1,1,1)
     """
-    ID = goodID(ID)
+    ID = goodID(ID, item='crystal')
     h=hkl[0]
     k=hkl[1]
-    l=hkl[2]
+    l=hkl[2]  # noqa: E741
 
     lp=latticeParameters[ID]
     a=lp[0]/u['ang']
@@ -911,7 +923,7 @@ def BraggEnergy(ID,hkl,twotheta):
     """
     ID=goodID(ID)
     d=dSpace(ID,hkl)
-    l=2*d*sind(twotheta/2.0)
+    l=2*d*sind(twotheta/2.0)  # noqa: E741
     E=lam2E(l)
     return E
 
@@ -923,11 +935,11 @@ def StructureFactor(ID,f,hkl,z=None):
         hkl is the reflection : (1,1,1)
         z is the rhombohedral lattice parameter
     """
-    ID=goodID(ID)
+    ID=goodID(ID, item='crystal')
     i=complex(0,1)
     h=hkl[0]
     k=hkl[1]
-    l=hkl[2]
+    l=hkl[2]  # noqa: E741
     L=latticeType[ID]
     if L=='fcc':
       F=f*(1+np.exp(-i*np.pi*(k+l))+np.exp(-i*np.pi*(h+l))+np.exp(-i*np.pi*(h+k)))
@@ -950,7 +962,7 @@ def StructureFactor(ID,f,hkl,z=None):
 
 
 def StructureFactorE(ID,hkl,E=None,z=None):
-    ID=goodID(ID)
+    ID=goodID(ID, item='crystal')
     # E = getE(E)
     theta=BraggAngle(ID,hkl,E)
     f=FF(ID,2*theta,E)
@@ -969,7 +981,7 @@ def UnitCellVolume(ID):
     alpha=lp[3]
     beta=lp[4]
     gamma=lp[5]
-    L=latticeType[ID]
+    # L=latticeType[ID]
     ca=cosd(alpha)
     cb=cosd(beta)
     cg=cosd(gamma)
@@ -1005,10 +1017,10 @@ def DarwinWidth(ID, hkl, E, T=293):
         E is photon energy in eV or keV
         T is the crystal temperature in Kelvin (default is 293)
     """
-    ID = goodID(ID)
+    ID = goodID(ID, item='crystal')
     E = eV(E)
     theta = BraggAngle(ID,hkl,E)
-    l = lam(E)
+    l = lam(E)  # noqa: E741
     f = FF(ID,2*theta,E)
     F = StructureFactor(ID,f,hkl)
     V = UnitCellVolume(ID)
@@ -1077,6 +1089,165 @@ def MomentumTransfer(E,twotheta):
   return p
 
 
+def hkl2str(hkl):
+    ''' Transfer hkl index to string
+    '''
+    return f'({hkl[0]},{hkl[1]},{hkl[2]})'
+
+
+def getX0h(matID, keV, hkl):
+    """ Get the Bragg reflection for a given material, photon energy and Bragg plane.
+        
+        This function uses the X0h database from the X0h CGI interface of the X-ray server at the Advanced Photon Source (APS) at Argonne National Laboratory (ANL).
+        https://x-server.gmca.aps.anl.gov/cgi/www_form.exe?template=x0h_form.htm
+
+    Args:
+        matID (String): Material ID. Available materials are listed in the function.
+        keV (float): Photon energy in keV
+        hkl (tuple, int): Bragg plane (h, k, l)
+
+    Returns:
+        Response object: returns the Response object from the request.
+    """
+    url = 'https://x-server.gmca.aps.anl.gov/cgi/x0h_form.exe'
+
+    matID_list = ['ADP', 'AlAs', 'AlFe3', 'AlN', 'AlP', 'AlSb', 'Aluminium', 'Ba2ScRuO6', 'BaSnO3', 'BaTiO3', 'Beril', 'Beryllium', 'Bi12GeO20', 'BiFeO3', 'Bismuth-fcc', 'Bismuth-primitive', 'Black_Phosphorus', 'C8H5KO4', 'C9H10N2', 'Ca2RuO4_HiTemp', 'Ca2RuO4_LoTemp', 'CaCO3_R3c', 'CaMnO3', 'CaRuO3', 'CdS', 'CdSe', 'CdTe', 'CeO2', 'Co2FeSi', 'Co2TiSi', 'CoAs', 'Copper', 'CoPS3_250K', 'Cr2AlC', 'CsCl', 'CsDSO4', 'CsF', 'CsH2PO4', 'Cu2ZnSnSe4', 'Cu3Au', 'Diamond', 'DyScO3', 'Fe-alpha', 'Fe2As', 'Fe2Mo3O8', 'Fe3O4', 'Fe3Si', 'FeBO3', 'FeGe2-alpha', 'FePS3', 'FeRh', 'FeSi', 'FeTiO3', 'Forsterite', 'Ga2O3-alpha', 'Ga2O3-beta', 'Ga2O3-gamma', 'Ga2O3-kappa', 'GaAs', 'GaN', 'GaN_cubic', 'GaP', 'GaSb', 'Gd2O3', 'Gd3Ga5O12', 'Gd3Sc2Ga3O12', 'GdSb', 'GdScO3', 'GeFe_primitive', 'Germanium', 'Ge_primitive', 'Gold', 'Graphite', 'HfO2', 'HgS', 'HgSe', 'HgTe', 'InAs', 'InGaAs', 'InN', 'InP', 'InSb', 'Iron-bcc', 'KAP', 'KCl', 'KDP', 'KTiOPO4', 'La(.5)Sr(1.5)MnO4', 'La(.7)Sr(.3)MnO3', 'La2CuO4_tetragonal', 'La2O3cub', 'La2O3hex', 'LaAlO3', 'LaCuO3', 'LaFeO3', 'LaInO3', 'LaMnO3', 'Langasite', 'LaNiO2', 'LaNiO3', 'LaNiO3_cubic', 'Lead', 'Li0.5Fe2.5O4_solutn', 'Li0.5Fe2.5O4_stchmtr', 'Li2B4O7', 'LiF', 'LiH', 'LiNbO3', 'LiTaO3', 'LSAT_cubic', 'LSAT_tetragonal', 'Lu2O3cub', 'LuPtBi', 'Magnetite', 'MgAl2O4', 'MgO', 'Mica', 'MnAs', 'Molybdenite', 'NaCl', 'NaOsO3', 'NbO2', 'NdGaO3', 'NdScO3', 'Nickel', 'Paratellurite', 'PbMg.24Nb.47Ti.29O3', 'PbMg.24Nb.48Ti.28O3r', 'PbMg.25Nb.49Ti.26O3h', 'PbMoO4', 'PbSe', 'PbTe', 'PbTiO3', 'PbWO4', 'PbZrO3', 'Pentaerythritol', 'Platinum', 'Pr2O3', 'PZT_PbZr.52Ti.48O3', 'Quartz', 'RuO2', 'Rutile', 'Sapphire_hex', 'Sapphire_rhomb', 'Sc2O3', 'Si-primitive', 'SiC-3c', 'SiC-4H', 'SiC-6H', 'SiFe-primitive', 'Silicon', 'Silver', 'SmNiO3', 'Sn2P2Se6', 'SnO2_Cassiterite', 'Sr2IrO4', 'Sr2TiO4', 'Sr3Al2O6', 'Sr3Ti2O7', 'Sr4Ti3O10', 'SrRuO3', 'SrTiO3', 'SrTiO3_tetragonal', 'SrVO3', 'Tantalum', 'Tellurium-I', 'Triglycine sulfate', 'Tungsten', 'Tungsten Disulfide', 'UO2', 'VO2_Rutile', 'Y3Al5O12', 'YAlO3', 'Zincite', 'Zn3P2', 'ZnS', 'ZnSe', 'ZnTe', 'ZrO2']
+    matID_alias = {
+        'Si': 'Silicon',
+        'YAG': 'Y3Al5O12',
+        'Ge': 'Germanium'
+    }
+    if matID in matID_alias:
+        matID = matID_alias[matID]
+    if matID not in matID_list:
+        raise ValueError(f"Material ID {matID} not found in the list of available materials.")
+    
+    # Parameters of X0h CGI interface
+    # Example from X0h search: https://x-server.gmca.aps.anl.gov/cgi/x0h_form.exe?#xway=2&wave=10&coway=0&code=Silicon&i1=2&i2=2&i3=0&df1df2=-1&modeout=1
+    xway = 2    # 2 - keV
+    wave = keV
+    coway = 0
+    code = matID
+    i1, i2, i3 = hkl[0], hkl[1], hkl[2]
+    df1df2 = -1  # automatic database selection
+    modeout = 1  # text output (no table)
+
+    # Building address
+    params = {
+        'xway': xway,
+        'wave': wave,
+        'coway': coway,
+        'code': code,
+        'i1': i1,
+        'i2': i2,
+        'i3': i3,
+        'df1df2': df1df2,
+        'modeout': modeout
+    }
+    
+    # Connect & Download
+    response = requests.get(url, params=params)
+
+    # Example to read the data
+    # content = response.text
+    # FWHMurad_sg: Darwin width (FWHM) in micro-radians for sigma polarization
+    # DarwinWidth = float(content.split('FWHMurad_sg= ')[1].strip().split(' ')[0]) * 1e-6
+    # prcnsg: relative diffraction intensity for sigma polarization
+    # xh_x0 = float(content.split('prcnsg= ')[1].strip().split(' ')[0]) * 0.01
+
+    return response
+
+
+def getX0h_plane(matID, keV, hkl_min, hkl_max, qb1=0., qb2=90., prcmin=0.1, df1df2=-1, hkl_base=(1,1,1), q1=0., q2=180.):
+    """ Get the relative diffraction intensity of a Bragg reflection for a given material and photon energy.
+        This function scans hkl planes in the range of hkl_min to hkl_max.
+        "prcmin" must be > 0 to generate results for the relative diffraction intensity.
+        
+        This function uses the X0h database from the X0h CGI interface of the X-ray server at the Advanced Photon Source (APS) at Argonne National Laboratory (ANL).
+        https://x-server.gmca.aps.anl.gov/cgi/www_form.exe?template=x0p_form.htm
+
+    Args:
+        matID (String): Material ID. Available materials are listed in the function.
+        keV (float): Photon energy in keV
+        hkl_min (tuple, int): Bragg plane range: minimum.
+        hkl_max (tuple, int): Bragg plane range: maximum.
+        qb1 (float, optional): Bragg angle range: minimum. Defaults to 0.
+        qb2 (float, optional): Bragg angle range: maximum. Defaults to 90.
+        prcmin (float, optional): Report threashold in percent. Must be > 0. Report when xh/x0 is greater than the given value. Defaults to 0.1
+        df1df2 (int, optional): Database for dispersion corrections. Defaults to -1 (auto select).
+        hkl_base (tuple, int, optional): Bragg plane of surface. Defaults to (1,0,0).
+        q1 (float, optional): Plans make angle Theta1. Defaults to 0.
+        q2 (float, optional): Plans make angle Theta2. Defaults to 180.
+
+    Returns:
+        Response object: returns the Response object from the request.
+        Data have 4 columns: 'hkl' in the format of (h k l), 'Angle to surface', 'Bragg angle' and 'Relative Intensity xh/x0(%)'
+    """
+    url = 'https://x-server.gmca.aps.anl.gov/cgi/x0p_form.exe'
+    
+    matID_list = ['ADP', 'AlAs', 'AlFe3', 'AlN', 'AlP', 'AlSb', 'Aluminium', 'Ba2ScRuO6', 'BaSnO3', 'BaTiO3', 'Beril', 'Beryllium', 'Bi12GeO20', 'BiFeO3', 'Bismuth-fcc', 'Bismuth-primitive', 'Black_Phosphorus', 'C8H5KO4', 'C9H10N2', 'Ca2RuO4_HiTemp', 'Ca2RuO4_LoTemp', 'CaCO3_R3c', 'CaMnO3', 'CaRuO3', 'CdS', 'CdSe', 'CdTe', 'CeO2', 'Co2FeSi', 'Co2TiSi', 'CoAs', 'Copper', 'CoPS3_250K', 'Cr2AlC', 'CsCl', 'CsDSO4', 'CsF', 'CsH2PO4', 'Cu2ZnSnSe4', 'Cu3Au', 'Diamond', 'DyScO3', 'Fe-alpha', 'Fe2As', 'Fe2Mo3O8', 'Fe3O4', 'Fe3Si', 'FeBO3', 'FeGe2-alpha', 'FePS3', 'FeRh', 'FeSi', 'FeTiO3', 'Forsterite', 'Ga2O3-alpha', 'Ga2O3-beta', 'Ga2O3-gamma', 'Ga2O3-kappa', 'GaAs', 'GaN', 'GaN_cubic', 'GaP', 'GaSb', 'Gd2O3', 'Gd3Ga5O12', 'Gd3Sc2Ga3O12', 'GdSb', 'GdScO3', 'GeFe_primitive', 'Germanium', 'Ge_primitive', 'Gold', 'Graphite', 'HfO2', 'HgS', 'HgSe', 'HgTe', 'InAs', 'InGaAs', 'InN', 'InP', 'InSb', 'Iron-bcc', 'KAP', 'KCl', 'KDP', 'KTiOPO4', 'La(.5)Sr(1.5)MnO4', 'La(.7)Sr(.3)MnO3', 'La2CuO4_tetragonal', 'La2O3cub', 'La2O3hex', 'LaAlO3', 'LaCuO3', 'LaFeO3', 'LaInO3', 'LaMnO3', 'Langasite', 'LaNiO2', 'LaNiO3', 'LaNiO3_cubic', 'Lead', 'Li0.5Fe2.5O4_solutn', 'Li0.5Fe2.5O4_stchmtr', 'Li2B4O7', 'LiF', 'LiH', 'LiNbO3', 'LiTaO3', 'LSAT_cubic', 'LSAT_tetragonal', 'Lu2O3cub', 'LuPtBi', 'Magnetite', 'MgAl2O4', 'MgO', 'Mica', 'MnAs', 'Molybdenite', 'NaCl', 'NaOsO3', 'NbO2', 'NdGaO3', 'NdScO3', 'Nickel', 'Paratellurite', 'PbMg.24Nb.47Ti.29O3', 'PbMg.24Nb.48Ti.28O3r', 'PbMg.25Nb.49Ti.26O3h', 'PbMoO4', 'PbSe', 'PbTe', 'PbTiO3', 'PbWO4', 'PbZrO3', 'Pentaerythritol', 'Platinum', 'Pr2O3', 'PZT_PbZr.52Ti.48O3', 'Quartz', 'RuO2', 'Rutile', 'Sapphire_hex', 'Sapphire_rhomb', 'Sc2O3', 'Si-primitive', 'SiC-3c', 'SiC-4H', 'SiC-6H', 'SiFe-primitive', 'Silicon', 'Silver', 'SmNiO3', 'Sn2P2Se6', 'SnO2_Cassiterite', 'Sr2IrO4', 'Sr2TiO4', 'Sr3Al2O6', 'Sr3Ti2O7', 'Sr4Ti3O10', 'SrRuO3', 'SrTiO3', 'SrTiO3_tetragonal', 'SrVO3', 'Tantalum', 'Tellurium-I', 'Triglycine sulfate', 'Tungsten', 'Tungsten Disulfide', 'UO2', 'VO2_Rutile', 'Y3Al5O12', 'YAlO3', 'Zincite', 'Zn3P2', 'ZnS', 'ZnSe', 'ZnTe', 'ZrO2']
+    matID_alias = {
+        'Si': 'Silicon',
+        'YAG': 'Y3Al5O12',
+        'Ge': 'Germanium'
+    }
+    if matID in matID_alias:
+        matID = matID_alias[matID]
+    if matID not in matID_list:
+        raise ValueError(f"Material ID {matID} not found in the list of available materials.")
+
+    # Parameters of X0h CGI interface
+    # Example from X0h search: https://x-server.gmca.aps.anl.gov/cgi/x0p_form.exe?xway=2&wave=11&code=Y3Al5O12&hkl11=0&hkl12=0&hkl13=0&hkl21=5&hkl22=5&hkl23=5&qb1=0.&qb2=90.&prcmin=1&df1df2=-1&base1=1&base2=0&base3=0&modesearch=3&q1=0.&q2=180.
+    xway = 2    # 2 - keV
+    wave = keV
+    code = matID
+    hkl11, hkl12, hkl13 = hkl_min[0], hkl_min[1], hkl_min[2]
+    hkl21, hkl22, hkl23 = hkl_max[0], hkl_max[1], hkl_max[2]
+    base1, base2, base3 = hkl_base[0], hkl_base[1], hkl_base[2]
+    modesearch = 3
+
+    # Building address
+    params = {
+        'xway': xway,
+        'wave': wave,
+        'code': code,
+        'hkl11': hkl11,
+        'hkl12': hkl12,
+        'hkl13': hkl13,
+        'hkl21': hkl21,
+        'hkl22': hkl22,
+        'hkl23': hkl23,
+        'qb1': qb1,
+        'qb2': qb2,
+        'prcmin': prcmin,
+        'df1df2': df1df2,
+        'base1': base1,
+        'base2': base2,
+        'base3': base3,
+        'modesearch': modesearch,
+        'q1': q1,
+        'q2': q2
+    }
+
+    # Connect & Download
+    response = requests.get(url, params=params)
+
+    # Example to read the data
+    # import pandas as pd
+    # tables = pd.read_html(response.text)
+    # _df = tables[-1]  # Return 4 columns: 'hkl' in the format of string (h k l), 'Angle to surface', 'Bragg angle' and 'Relative Intensity xh/x0(%)'
+    
+    # Pick data
+    # data = df[(df['hkl'] == '(0 0 1)') & (df['keV'] == 10.0)]
+    # bragg = df['Bragg angle'].to_numpy()
+
+    # Convert string to tuple
+    # hkl = df['hkl'].str.strip('()')
+    # hkl = [tuple(map(int, x.split())) for x in hkl]
+    
+    return response
+
+
 def loglog_negy_interp1d(x, y, xx):
     ''' 1D log-log interpolation supprting negative y values:
             linear interpolation for data before the last negative data;
@@ -1124,6 +1295,15 @@ def get_Ef1f2(Z, datafile='f1f2_EPDL97.dat'):
 
 
 def Reflectivity_uncoated(E, theta, sub_mat, f1f2data='default', f1f2interp='linear'):
+    '''
+        E: photon energy in eV
+        theta: incideng angle in rad
+        sub_mat: material ID of substrate
+        f1f2data:   'default', use 'f1f2_EPDL97.dat' file;
+                    name data file (currently have 'f1f2_Windt.dat')
+        f1f2interp: 'linear', default, linear interpolation for photon energy
+                    else, log-log interpolation
+    '''
     E = np.asarray(E, dtype=np.float64)
     scalar_E = False
     if E.ndim == 0:
@@ -1161,6 +1341,17 @@ def Reflectivity_uncoated(E, theta, sub_mat, f1f2data='default', f1f2interp='lin
 
 
 def Reflectivity_coated(E, theta, sub_mat, coat_mat, coat_thickness, f1f2data='default', f1f2interp='linear'):
+    '''
+        E: photon energy in eV
+        theta: incideng angle in rad
+        sub_mat: material ID of substrate
+        coat_mat: material ID of coating
+        coat_thickness: coating thickness in m
+        f1f2data:   'default', use 'f1f2_EPDL97.dat' file;
+                    name data file (currently have 'f1f2_Windt.dat')
+        f1f2interp: 'linear', default, linear interpolation for photon energy
+                    else, log-log interpolation
+    '''
     E = np.asarray(E, dtype=np.float64)
     scalar_E = False
     if E.ndim == 0:
@@ -1249,10 +1440,200 @@ def center_temp(power_W, rms_mm, attL_m, K):
                             1 - 2 / np.sqrt(np.pi) / W2))
     return Tmax * N
 
+def keV2lamda(keV):
+    ''' Covert photon energy to wavelength in m (SI unit)
+    '''
+    return 1239.8 / (keV*1000) * 1e-9
+
+def lamda2keV(lamda_nm):
+    ''' Convert photon wavelength to energy in keV
+        lamda_nm: wavelength in nm
+    '''
+    return 1239.8 / lamda_nm * 0.001
+
+
+## Gaussian beam propogation
+def RayleighLength(keV, sigma0_um, n=1):
+    ''' Return the Rayleigh range in m (SI unit)
+       keV: photon energy in keV
+       sigma0_um: sigma in um
+       n:   refractive index of the medium (default 1 for vacuum). Not tested for non-vacuum yet.
+    '''
+    return 4 * np.pi * (sigma0_um*1e-6)**2 * n / keV2lamda(keV)
+
+def LensFocalLength(keV, radius_um, matID='Be'):
+    ''' Return the focal length of a lens in m
+        Note: Use LensFocalDistance to calculate for a specific source
+        keV: photon energy in keV
+        radius_um: effectiv radius of lens
+        matID: material of lens, default as Be (beryllium)
+    '''
+    delta = 1 - xl.Refractive_Index_Re(matID, keV, Density[matID])
+    return radius_um * 1e-6 / (2 * delta)
+
+def LensFocalDistance(s, f, LR):
+    ''' Return the distance from the focal point to lens
+        Note: no focusing if s > f
+        s: Distance from source to lens
+        f: Lens focal length (refer LensFocalLength function)
+        LR: Raileigh Lengh (refer RayleighRange function)
+    '''
+    if f < s:
+        return f + (s - f) / ((s/f - 1)**2 + (LR/f)**2)
+    else:
+        raise Warning(f'Source distance ({s}) > focal length ({f}): Beam will NOT be focused.')
+        return np.Inf
+
+def LensFocalSigma(s, f, LR, sigma0):
+    ''' Return the focal size
+        Note: no focusing if s > f
+        s: Distance from source to lens
+        f: Lens focal length (refer LensFocalLength function)
+        LR: Raileigh Lengh (refer RayleighRange function)
+        sigma0: source sigma; half of waist (sigma0 = w0/2)
+    '''
+    if f < s:
+        return sigma0 / np.sqrt((1 - s/f)**2 + (LR/f)**2)
+    else:
+        raise Exception(f'Source distance ({s}) > focal length ({f}): Beam will NOT be focused.')
+
+
+def initGaussianBeam(keV, sigma0_um, M_square=1.0):
+    """_summary_
+
+    Args:
+        keV (float, array_like): keV
+        sigma0_um (float, array_like): sigma in um
+        M_square(float, array_like): M^2. Default to 1.
+    Returns:
+        complex, array_like: q of Gaussian beam
+    """    
+    zR = RayleighLength(keV, sigma0_um)
+    return zR / M_square * 1j
+
+def propagateFreeSpace(q_in, d_m):
+    """ free space propogation
+
+    Args:
+        q_in (complex, array_like): input Gaussian Beam, SI unit
+        d_m (float, array_like): free space lengh in meters
+
+    Returns:
+        q_out (complex, array_like): q out
+    """
+    return q_in + d_m
+
+def propagateThinLens(q_in, f_m):
+    """ thin lens propogation
+
+    Args:
+        q_in (complex, array_like): input Gaussian Beam, SI unit
+        f_m (float, array_like): lens focal length in meters
+
+    Returns:
+        q_out (complex, array_like): q out
+    """
+    return 1 / (1/q_in - 1/f_m)
+
+
+def getGaussianSigma_um(q, keV, M_square=1.0):
+    """ get sigma in um of q
+
+    Args:
+        q (complex, array_like): complex Gaussian beam
+        keV (float, array_like): keV
+        M_square (float, array_like): M^2, beam quality factor. Default to 1.
+
+    Returns:
+        sigma_um (float, array_like): sigma size in um
+    """
+    im = (1/q).imag
+    lamda = keV2lamda(keV)
+    return np.sqrt(-M_square * lamda / (4 * np.pi * im)) * 1e6
+
+
+class GaussianBeam:
+    def __init__(self, keV, sigma0_um, M_square=1.0):
+        ''' Initialize a Gaussian beam
+            keV: photon energy
+            z0:  waist location in m
+            sigma0:  sigma size in um
+            M_square: beam quality factor, default to 1
+        '''
+        self.keV = keV
+        self.sigma = sigma0_um
+        self.M2 = M_square
+        self.w = self.sigma * 2
+        zR = RayleighLength(keV, sigma0_um)
+        self.lamda = keV2lamda(keV)
+        self.q0 = zR / M_square * 1j
+        self.q = self.q0
+        self.propogation = []
+
+    ## Transport functions
+    def addFreeSpace(self, d):
+        ''' Transport in free space (n=1)
+            d: transport distance in m
+        '''
+        self.propogation.append(("Free Space", d))
+        self.q = self.q + d
+        self.R = self.getR_m()
+        self.w = self.getWaist_um()
+        self.sigma = self.w / 2
+
+    def addThinLens(self, f):
+        ''' Transport through a think lens
+            f: focal length in m
+        '''
+        self.propogation.append(("Thin Lens", f))
+        self.q = 1 / (1/self.q - 1/f)
+        self.R = self.getR_m()
+        self.w = self.getWaist_um()
+        self.sigma = self.w / 2
+
+    ## Get beam information
+    def getR_m(self):
+        ''' Get the radius of curvature in m (positive for diverging, negative for convergin)
+        '''
+        # if self.q.real == 0:
+        #     return np.inf
+        # else:
+        return 1 / (1/self.q).real
+
+    def getWaist_um(self):
+        ''' Get the waist in um
+        '''
+        im = (1/self.q).imag
+        return np.sqrt(-self.M2 * self.lamda / (np.pi * im)) * 1e6
+
+    def getSigma_um(self):
+        ''' Get the sigma of beam: sigma = waist / 2
+        '''
+        return self.getWaist_um() / 2
+
+    def print(self):
+        ''' Print beam information
+        '''
+        print(f'{self.keV} keV, {self.sigma0} um waist:')
+        print('Propogation List:')
+        for i in range(len(self.propogation)):
+            if self.propogation[i][0] == "Free Space":
+                print(f'  {i+1}. Free Space {self.propogation[i][1]} m')
+            if self.propogation[i][0] == "Thin Lens":
+                print(f'  {i+1}. Thin Lens with {self.propogation[i][1]} m focal length')
+        print(f'Complex beam parameter q = {self.q}')
+        print(f'Radius of curvature R = {self.R} m')
+        print(f'Beam waist = {self.w} um, rms = {self.sigma} um')
+
+    def reset(nstep=0):
+        ''' Reset '''
+        pass
 
 """ Define units and constants
     - Muliply to convert from SI unit to the target unit:
         e.g. a*u['cm'] to get from m to cm
+    - Devide to covert from the indicated unit to SI unit
+        e.g. a/u['cm'] to get from cm to m
 """
 u = {'fm': 1e15,
      'pm': 1e12,
@@ -1819,7 +2200,7 @@ Density = {'H' :0.00008988,
      'C1.5H0.3O4.3N0.4PCa2.2':1.92,
      'Be0.9983O0.0003Al0.0001Ca0.0002C0.0003Cr0.000035Co0.000005Cu0.00005Fe0.0003Pb0.000005Mg0.00006Mn0.00003Mo0.00001Ni0.0002Si0.0001Ag0.000005Ti0.00001Zn0.0001':1.85,
      'Be.994O.004Al.0005B.000003Cd.0000002Ca.0001C.0006Cr.0001Co.00001Cu.0001Fe.0008Pb.00002Li.000003Mg.00049Mn.0001Mo.00002Ni.0002N.0003Si.0004Ag.00001':1.85,
-     'Air':0.001225,
+     'Air':0.001225,  #  International Standard Atmosphere (ISA) values: 15 degC at sea level
      'air':0.001225
 }
 
@@ -2286,7 +2667,8 @@ latticeType = {'H' :'hcp',
      'LaAlO3':'rhomb',
      'La0.7Sr0.3MnO3':'rhomb',
      'GGG':'cubic',
-     'YAG':'cubic'
+     'YAG':'cubic',
+     'Y3Al5O12':'cubic'
 }
 
 
@@ -2381,7 +2763,8 @@ latticeParameters = {
      'LaAlO3':(5.377,5.377,5.377,60.13,60.13,60.13),
      'La0.7Sr0.3MnO3':(5.4738,5.4738,5.4738,60.45,60.45,60.45),
      'Gd3Ga5O12':(12.383,12.383,12.383,90,90,90),
-     'YAG':(12.006,12.006,12.006,90,90,90)  # from https://x-server.gmca.aps.anl.gov/cgi/www_form.exe?template=x0h_form.htm
+     'YAG':(12.006,12.006,12.006,90,90,90),  # from https://x-server.gmca.aps.anl.gov/cgi/www_form.exe?template=x0h_form.htm
+     'Y3Al5O12':(12.006,12.006,12.006,90,90,90)
 }
 
  
@@ -2447,6 +2830,7 @@ specificHeatParams = {
     'TaC':(44.29224,7.673707,-0.091309,0.010861,-0.875548),
     'TiB2':(52.33264,33.69484,-7.909266,0.803989,-1.540905),
     'YAG':(376,0,0,0,0),
+    'Y3Al5O12':(376,0,0,0,0),
     'ZnO':(40.2,0,0,0,0),
     'CaSiO5':(111,0,0,0,0),
     'H2O':(75.327,0,0,0,0),
@@ -2464,12 +2848,19 @@ specificHeat = {
     'CVD': np.array([[50, 100, 150, 200, 250, 298, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000],
                      [0.052335, 0.20850264, 1.00022652, 2.3801958, 4.15456164, 6.07797756, 6.16045752, 8.21575764, 10.17643608, 11.96252496, 13.544298, 14.92217388, 16.11206244, 17.1365724, 18.01831248, 18.77821668, 19.43470692, 20.00411172, 20.50024752, 20.93358132, 21.31416144, 21.6499428, 22.44627216, 22.8452742, 23.1697512, 23.43603168, 23.6575134, 23.99999364, 24.24952692, 24.43667688, 24.58028412, 24.69290904, 24.78292524, 24.82521192],
                      [0.00, 6.52, 36.74, 121.25, 284.62, 530.20, 542.44, 901.84, 1361.65, 1915.12, 2552.79, 3264.45, 4040.31, 4871.53, 5750.40, 6670.31, 7625.63, 8611.61, 9624.21, 10660.06, 11716.25, 13864.46, 16069.27, 18333.85, 20634.60, 22964.89, 25319.56, 30085.32, 34910.27, 39778.89, 44680.58, 49607.90, 54555.49, 59516.30]
-                    ])
+                    ]),
+    # Graphite: https://webbook.nist.gov/cgi/cbook.cgi?ID=C7782425&Units=SI&Mask=2#Thermo-Condensed
+    # T = 200 to 3500 K. Least squares fit of 'best' data gives: Cp = 0.538657 + 9.11129x10-6*T - 90.2725*T^-1 - 43449.3*T^-2 + 1.59309x10^7*T^-3 - 1.43688x10^9*T^-4 cal/g*K (250 to 3000 K)
+    'Graphite': np.array([[300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 3900],
+                          [8.55, 10.30, 11.94, 13.42, 14.73, 15.86, 16.85, 17.71, 18.47, 19.13, 19.72, 20.25, 20.71, 21.14, 21.52, 22.18, 22.73, 23.20, 23.61, 23.96, 24.28, 24.81, 25.24, 25.61, 25.93, 26.21, 26.46, 26.69, 26.90, 27.10, 27.28, 27.45, 27.54],
+                          [0, 471, 1028, 1663, 2367, 3133, 3951, 4816, 5721, 6661, 7633, 8633, 9657, 10703, 11770, 13955, 16201, 18499, 20839, 23218, 25631, 30541, 35547, 40634, 45789, 51004, 56272, 61588, 66948, 72348, 77786, 83260, 86009]
+                         ])
 }
 
 # Latent heat in kJ/mol
 # (Heat of Fusion, Heat of Vaporization)
+# Heat of Vaporization: https://en.wikipedia.org/wiki/Enthalpy_of_vaporization
 latentHeat = {
      'Fe':(13.81, 340),
-    'H2O':(4.0)
+    'H2O':(6.009, 40.66)
 }

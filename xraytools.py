@@ -207,7 +207,7 @@ def mu_en(matID, keV, density=None):
         energies = np.array(keV, dtype=np.double)
     _mu = np.array([xl.CS_Energy_CP(mat, eng) * density * u['cm'] for eng in energies])
     if np.isscalar(keV):
-        return np.asscalar(_mu)
+        return _mu.item()
     else:
         return _mu
 
@@ -322,9 +322,9 @@ def drillSpeed(matID, power_W, FWHM_mm):
         'Cu': 29.67 + 13.26 + 48.77 + 300,
         'Fe': 49.62 + 13.81 + 60.89 + 340,
         'W' :119.39 + 52.31 + 89.19 + 774,
-        'Mo':  89.9 + 37.5  + 71.9  + 598,
+        'Mo': 89.9  + 37.5  + 71.9  + 598,
         'Al': 17.97 + 10.71 + 59.06 + 284,
-        'C':  86.00 +                 715  # Graphite, sublimation from 3900 K at normal pressure (no melting), https://en.wikipedia.org/wiki/Heats_of_vaporization_of_the_elements_(data_page)
+        'C':  29.23 +                 715  # Graphite: use 8.12 J/mol/K from webbook (a small heat capacity from Sheindlin 1972 for 263-3650K); sublimation from 3900 K at normal pressure (no melting), https://en.wikipedia.org/wiki/Heats_of_vaporization_of_the_elements_(data_page)
     }
     if matID not in vaporH.keys():
         raise ValueError(f'No vaporization data for {matID}: available in {vaporH.keys()}')

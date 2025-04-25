@@ -1464,11 +1464,14 @@ def RayleighLength(keV, sigma0_um, n=1):
 def LensFocalLength(keV, radius_um, matID='Be'):
     ''' Return the focal length of a lens in m
         Note: Use LensFocalDistance to calculate for a specific source
-        keV: photon energy in keV
+        keV (Vectorized): photon energy in keV
         radius_um: effectiv radius of lens
         matID: material of lens, default as Be (beryllium)
     '''
-    delta = 1 - xl.Refractive_Index_Re(matID, keV, Density[matID])
+    if np.isscalar(keV):
+        delta = 1 - xl.Refractive_Index_Re(matID, keV, Density[matID])
+    else:
+        delta = np.array([1 - xl.Refractive_Index_Re(matID, k, Density[matID]) for k in keV])
     return radius_um * 1e-6 / (2 * delta)
 
 def LensFocalDistance(s, f, LR):
@@ -1478,11 +1481,17 @@ def LensFocalDistance(s, f, LR):
         f: Lens focal length (refer LensFocalLength function)
         LR: Raileigh Lengh (refer RayleighRange function)
     '''
-    if f < s:
-        return f + (s - f) / ((s/f - 1)**2 + (LR/f)**2)
+    if np.isscalar(s) and np.isscalar(f):
+        if f < s:
+            return f + (s - f) / ((s/f - 1)**2 + (LR/f)**2)
+        else:
+            raise Warning(f'Source distance ({s}) > focal length ({f}): Beam will NOT be focused.')
+            return np.Inf
     else:
-        raise Warning(f'Source distance ({s}) > focal length ({f}): Beam will NOT be focused.')
-        return np.Inf
+        idx = f >= s
+        d = f + (s - f) / ((s/f - 1)**2 + (LR/f)**2)
+        d[idx] = np.Inf
+        return d
 
 def LensFocalSigma(s, f, LR, sigma0):
     ''' Return the focal size
@@ -1492,10 +1501,16 @@ def LensFocalSigma(s, f, LR, sigma0):
         LR: Raileigh Lengh (refer RayleighRange function)
         sigma0: source sigma; half of waist (sigma0 = w0/2)
     '''
-    if f < s:
-        return sigma0 / np.sqrt((1 - s/f)**2 + (LR/f)**2)
+    if np.isscalar(s) and np.isscalar(f):
+        if f < s:
+            return sigma0 / np.sqrt((1 - s/f)**2 + (LR/f)**2)
+        else:
+            raise Exception(f'Source distance ({s}) > focal length ({f}): Beam will NOT be focused.')
     else:
-        raise Exception(f'Source distance ({s}) > focal length ({f}): Beam will NOT be focused.')
+        idx = f >= s
+        sigma = sigma0 / np.sqrt((1 - s/f)**2 + (LR/f)**2)
+        sigma[idx] = np.nan
+        return sigma
 
 
 def initGaussianBeam(keV, sigma0_um, M_square=1.0):

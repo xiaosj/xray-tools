@@ -1486,15 +1486,15 @@ def LensFocalDistance(s, f, LR):
             return f + (s - f) / ((s/f - 1)**2 + (LR/f)**2)
         else:
             raise Warning(f'Source distance ({s}) > focal length ({f}): Beam will NOT be focused.')
-            return np.Inf
+            return np.inf
     else:
         idx = f >= s
         d = f + (s - f) / ((s/f - 1)**2 + (LR/f)**2)
-        d[idx] = np.Inf
+        d[idx] = np.inf
         return d
 
 def LensFocalSigma(s, f, LR, sigma0):
-    ''' Return the focal size
+    ''' Return the focal size (in the same unit of sigma0)
         Note: no focusing if s > f
         s: Distance from source to lens
         f: Lens focal length (refer LensFocalLength function)

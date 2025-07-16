@@ -242,8 +242,7 @@ def eVatom(matID, keV, mJ, rms_mm, density=None):
     attL = attenuationLength(matID, keV, density)
     EdensityJcm3 = mJ/1000 / (2 * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
     atomVolcm3 = atomWeight(matID) / c['NA'] / density
-    natoms = xl.CompoundParser(matID)['nAtomsAll']
-    return EdensityJcm3 * atomVolcm3 / 1.6e-19 / natoms
+    return EdensityJcm3 * atomVolcm3 / 1.6e-19
 
 
 def eVatom_en(matID, keV, mJ, rms_mm, density=None):

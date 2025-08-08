@@ -198,6 +198,7 @@ def mu_en(matID, keV, density=None):
           keV: energy in keV (vectorized)
           density in g/cm3, None=default density
     """
+    print('!!!\nWARNING: The CS_Energy cross section from xraylib is questionable at this time. Double check before using.\n!!!')
     mat = goodID(matID)
     if density is None:
         density = defaultDensity(matID)
@@ -242,8 +243,7 @@ def eVatom(matID, keV, mJ, rms_mm, density=None):
     attL = attenuationLength(matID, keV, density)
     EdensityJcm3 = mJ/1000 / (2 * np.pi * attL*u['cm'] * (rms_mm*0.1)**2)
     atomVolcm3 = atomWeight(matID) / c['NA'] / density
-    natoms = xl.CompoundParser(matID)['nAtomsAll']
-    return EdensityJcm3 * atomVolcm3 / 1.6e-19 / natoms
+    return EdensityJcm3 * atomVolcm3 / 1.6e-19
 
 
 def eVatom_en(matID, keV, mJ, rms_mm, density=None):
@@ -314,7 +314,7 @@ def eVatom_keV_plot(matID, keV, mJ, rms_mm, density=None, logx=False, logy=True)
         plt.show()
 
 
-def drillSpeed(matID, power_W, FWHM_mm):
+def drillSpeed(matID, power_W, FWHM_mm, density=None):
     """ Return the material drill speed (mm/s) based on vaporization heat """
     vaporH = {  # kJ/mol
         # spec heat from room temperature to melting + latent heat of fusion + spec heat from melting to boiling + latent heat of vaporization
@@ -328,8 +328,10 @@ def drillSpeed(matID, power_W, FWHM_mm):
     }
     if matID not in vaporH.keys():
         raise ValueError(f'No vaporization data for {matID}: available in {vaporH.keys()}')
-    
-    mol_mmD = 2 * np.pi * (FWHM_mm/2.355)**2 / 1000 * defaultDensity(matID) / molarMass(matID)
+    if density is None:
+        density = defaultDensity(matID)
+
+    mol_mmD = 2 * np.pi * (FWHM_mm/2.355)**2 / 1000 * density / molarMass(matID)
     return power_W / (mol_mmD * vaporH[matID] * 1000)
 
 
@@ -338,8 +340,25 @@ def drillTime(matID, thickness_mm, W, FWHM_mm):
     return thickness_mm / drillSpeed(matID, W, FWHM_mm)
 
 
+def drillSpeed_Diling(matID, mJ, keV, FWHM_mm, doseLimit = None, limitRatio = 1.0):
+    """ Return the material drill speed (mm/pulse) based on eV/atom limit
+        * mJ: pulse energy in mJ
+        * kHz: repetition rate in kHz
+        * keV: photon energy in keV
+        * FWHM_mm: beam size FWHM in mm
+        * doseLimit: dose limit in eV/atom, None=default value (Melting dose * limitRatio)
+        * limitRatio: ratio of the dose limit to the melting dose, default is 1.0
+    """
+    matID = goodID(matID)
+    if doseLimit is None:
+        doseLimit = meltDose[matID] * limitRatio
+    maxDose = eVatom(matID, keV, mJ, FWHM_mm/2.355)
+    attL_mm = attenuationLength(matID, keV) * 1000
+    return attL_mm * np.log(maxDose / doseLimit)
+
+
 def getCp(matID, T):
-    goodID(matID, 'Cp')
+    matID = goodID(matID, 'Cp')
     if matID in specificHeatParams:
         TT = T / 1000
         A = specificHeatParams[matID]
@@ -351,7 +370,7 @@ def getIntCp(matID, T1_K, T2_K):
     """ Get integrated heat capacity in J/mol
         * T1, T2 in K
     """
-    goodID(matID, 'Cp')
+    matID = goodID(matID, 'Cp')
     if matID in specificHeatParams:
         A = specificHeatParams[matID]
         return intCp2(T1_K, T2_K, A)
@@ -1486,15 +1505,15 @@ def LensFocalDistance(s, f, LR):
             return f + (s - f) / ((s/f - 1)**2 + (LR/f)**2)
         else:
             raise Warning(f'Source distance ({s}) > focal length ({f}): Beam will NOT be focused.')
-            return np.Inf
+            return np.inf
     else:
         idx = f >= s
         d = f + (s - f) / ((s/f - 1)**2 + (LR/f)**2)
-        d[idx] = np.Inf
+        d[idx] = np.inf
         return d
 
 def LensFocalSigma(s, f, LR, sigma0):
-    ''' Return the focal size
+    ''' Return the focal size (in the same unit of sigma0)
         Note: no focusing if s > f
         s: Distance from source to lens
         f: Lens focal length (refer LensFocalLength function)
@@ -1540,15 +1559,26 @@ def propagateFreeSpace(q_in, d_m):
 
 def propagateThinLens(q_in, f_m):
     """ thin lens propogation
-
     Args:
         q_in (complex, array_like): input Gaussian Beam, SI unit
         f_m (float, array_like): lens focal length in meters
-
     Returns:
         q_out (complex, array_like): q out
     """
     return 1 / (1/q_in - 1/f_m)
+
+
+# def propagateCurvedMirror(q_in, R, theta):
+#     """ curved mirror propgation, focal length f = R/2
+#     Args:
+#         q_in (complex, array_like): input Gaussian Beam, SI unit
+#         R (float, array_like): radius of curvature
+#         theta (float, array_like): angle of incidence
+#     Returns:
+#         q_out (complex, array_like): q out
+#     """
+#     Re = R * np.cos(theta)
+#     return 1 / (1/q_in - 2/Re)
 
 
 def getGaussianSigma_um(q, keV, M_square=1.0):
@@ -1828,7 +1858,7 @@ elementName = {'H' :'Hydrogen',
 alias={'Air':'N1.562O.42C.0003Ar.0094',
        'air':'N1.562O.42C.0003Ar.0094',
        'C*':'C',
-       'CVD':'C',
+       'Diamond':'C',
        'mylar':'C10H8O4',
        'Mylar':'C10H8O4',
        'polyimide':'C22H10N2O5',
@@ -2161,7 +2191,7 @@ Density = {'H' :0.00008988,
      'U':18.95,
      'Np':20.45,
      'Pu':19.84,
-     'CVD':3.515,
+     'Diamond':3.515,
      'H2O':1.0,
      'B4C':2.52,
      'SiO2':2.2,
@@ -2227,7 +2257,7 @@ meltPoint = {'H' :14.175,
      'Be':1560,
      'B':2573,
      'C':3948,
-     'CVD':3948,
+     'Diamond':3948,
      'N':63.29,
      'O':50.5,
      'F':53.65,
@@ -2860,10 +2890,10 @@ specificHeatParams = {
 # List of specific heat
 #  [K, J/mol/K, Integrated J/mol]
 specificHeat = {
-    'CVD': np.array([[50, 100, 150, 200, 250, 298, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000],
-                     [0.052335, 0.20850264, 1.00022652, 2.3801958, 4.15456164, 6.07797756, 6.16045752, 8.21575764, 10.17643608, 11.96252496, 13.544298, 14.92217388, 16.11206244, 17.1365724, 18.01831248, 18.77821668, 19.43470692, 20.00411172, 20.50024752, 20.93358132, 21.31416144, 21.6499428, 22.44627216, 22.8452742, 23.1697512, 23.43603168, 23.6575134, 23.99999364, 24.24952692, 24.43667688, 24.58028412, 24.69290904, 24.78292524, 24.82521192],
-                     [0.00, 6.52, 36.74, 121.25, 284.62, 530.20, 542.44, 901.84, 1361.65, 1915.12, 2552.79, 3264.45, 4040.31, 4871.53, 5750.40, 6670.31, 7625.63, 8611.61, 9624.21, 10660.06, 11716.25, 13864.46, 16069.27, 18333.85, 20634.60, 22964.89, 25319.56, 30085.32, 34910.27, 39778.89, 44680.58, 49607.90, 54555.49, 59516.30]
-                    ]),
+    'Diamond': np.array([[50, 100, 150, 200, 250, 298, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000],
+                         [0.052335, 0.20850264, 1.00022652, 2.3801958, 4.15456164, 6.07797756, 6.16045752, 8.21575764, 10.17643608, 11.96252496, 13.544298, 14.92217388, 16.11206244, 17.1365724, 18.01831248, 18.77821668, 19.43470692, 20.00411172, 20.50024752, 20.93358132, 21.31416144, 21.6499428, 22.44627216, 22.8452742, 23.1697512, 23.43603168, 23.6575134, 23.99999364, 24.24952692, 24.43667688, 24.58028412, 24.69290904, 24.78292524, 24.82521192],
+                         [0.00, 6.52, 36.74, 121.25, 284.62, 530.20, 542.44, 901.84, 1361.65, 1915.12, 2552.79, 3264.45, 4040.31, 4871.53, 5750.40, 6670.31, 7625.63, 8611.61, 9624.21, 10660.06, 11716.25, 13864.46, 16069.27, 18333.85, 20634.60, 22964.89, 25319.56, 30085.32, 34910.27, 39778.89, 44680.58, 49607.90, 54555.49, 59516.30]
+                        ]),
     # Graphite: https://webbook.nist.gov/cgi/cbook.cgi?ID=C7782425&Units=SI&Mask=2#Thermo-Condensed
     # T = 200 to 3500 K. Least squares fit of 'best' data gives: Cp = 0.538657 + 9.11129x10-6*T - 90.2725*T^-1 - 43449.3*T^-2 + 1.59309x10^7*T^-3 - 1.43688x10^9*T^-4 cal/g*K (250 to 3000 K)
     'Graphite': np.array([[300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 3900],

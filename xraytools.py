@@ -349,20 +349,12 @@ def drillSpeed_Diling(matID, mJ, keV, FWHM_mm, doseLimit = None, limitRatio = 1.
         * doseLimit: dose limit in eV/atom, None=default value (Melting dose * limitRatio)
         * limitRatio: ratio of the dose limit to the melting dose, default is 1.0
     """
-<<<<<<< HEAD
     matID = goodID(matID)
-=======
-    goodID(matID)
->>>>>>> 4e6e0465eecdbefaf51373fc97e559adcefdf8fc
     if doseLimit is None:
         doseLimit = meltDose[matID] * limitRatio
     maxDose = eVatom(matID, keV, mJ, FWHM_mm/2.355)
     attL_mm = attenuationLength(matID, keV) * 1000
-<<<<<<< HEAD
     return attL_mm * np.log(maxDose / doseLimit)
-=======
-    return attL_mm * np.log(maxDose / doseLimit) * 1000
->>>>>>> 4e6e0465eecdbefaf51373fc97e559adcefdf8fc
 
 
 def getCp(matID, T):

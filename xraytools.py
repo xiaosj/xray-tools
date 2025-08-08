@@ -198,6 +198,7 @@ def mu_en(matID, keV, density=None):
           keV: energy in keV (vectorized)
           density in g/cm3, None=default density
     """
+    print('!!!\nWARNING: The CS_Energy cross section from xraylib is questionable at this time. Double check before using.\n!!!')
     mat = goodID(matID)
     if density is None:
         density = defaultDensity(matID)

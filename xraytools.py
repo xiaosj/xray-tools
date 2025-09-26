@@ -1043,7 +1043,7 @@ def DarwinWidth(ID, hkl, E, T=293):
     f = FF(ID,2*theta,E)
     F = StructureFactor(ID,f,hkl)
     V = UnitCellVolume(ID)
-    dw=(2*c['eRad']*l**2*np.abs(F))/(np.pi*V*sind(2*theta))/u['rad']
+    dw = (2*c['eRad'] * l**2 * np.abs(F)) / (np.pi * V * sind(2*theta)) / u['rad']
     return dw
 
 
@@ -1056,13 +1056,6 @@ def DarwinWidthE(ID, hkl, E, T=293):
     """
     E = eV(E)
     return DeltaEoE(ID, hkl, E, T) * E
-    # ID = goodID(ID)
-    # E = eV(E)
-    # dw       = DarwinWidth(ID,hkl,E,T)
-    # theta    = BraggAngle(ID,hkl,E)
-    # DeltaEoE = 1/tand(theta) * dw * u['rad']
-    # DeltaE   = DeltaEoE * E
-    # return DeltaE
 
 
 def DeltaEoE(ID, hkl, E, T=293):
@@ -1072,17 +1065,16 @@ def DeltaEoE(ID, hkl, E, T=293):
     return 1/tand(theta) * dw * u['rad']
 
 
-def index(ID,E=None):
-    ID=goodID(ID)
+def Refractive_Index(ID, E):
+    ID = goodID(ID)
     E = keV(E)
-    d=Density[ID]
-    n_real=xl.Refractive_Index_Re(ID,E,d)
-    n_imag=xl.Refractive_Index_Im(ID,E,d)
-    n=complex(n_real,n_imag)
-    return n
+    d = Density[ID]
+    n_real = xl.Refractive_Index_Re(ID, E, d)
+    n_imag = xl.Refractive_Index_Im(ID, E, d)
+    return complex(n_real, n_imag)
 
 
-def FF(ID,twotheta,E=None):
+def FF(ID, twotheta, E):
     """
     Returns the atomic form factor for Rayleigh scattering
     ID is the element name
@@ -1090,14 +1082,14 @@ def FF(ID,twotheta,E=None):
     E is the photon energy (default us current LCLS value)
     """
     E = keV(E)
-    ID=goodID(ID)
-    z=elementZ[ID]
-    q=MomentumTransfer(E, twotheta)
-    f=xl.FF_Rayl(z,q)
+    ID = goodID(ID)
+    z = elementZ[ID]
+    q = MomentumTransfer(E, twotheta)
+    f = xl.FF_Rayl(z, q)
     return f
 
 
-def MomentumTransfer(E,twotheta):
+def MomentumTransfer(E, twotheta):
   """Returns the momentum transfer in Ang^-1 from xraylib [sin(2theta)/lam]
      E is the photon energy (eV or KeV)
      twotheta is the scattering angle in degrees

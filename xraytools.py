@@ -10,7 +10,7 @@ import xraylib as xl
 import requests
 
 
-def goodID(matID, item=None):
+def goodID(matID: str, item: str=None) -> str:
     """ Check if the material ID is defined:
         item = None,    in xraylib
              'density', in density dictionary
@@ -52,7 +52,7 @@ def goodID(matID, item=None):
     return id
 
 
-def eV(E):
+def eV(E: float) -> float:
     """ Returns photon energy in eV if specified in eV or keV """
     if np.max(E) < 100:
         return E * 1000
@@ -60,7 +60,7 @@ def eV(E):
         return E
 
 
-def keV(E):
+def keV(E: float) -> float:
     """ Returns photon energy in keV if specified in eV or keV """
     if np.min(E) >= 100:
         return E / 1000
@@ -68,85 +68,85 @@ def keV(E):
         return E
    
 
-def lam(E):
+def lam(E: float) -> float:
     """ Computes photon wavelength in m
         E is photon energy in eV
     """
     return (12398.4/E)*1e-10
 
-def lam2E(l):  # noqa: E741
+def lam2E(l: float) -> float:
     """ Computes photon energy in eV
         l is photon wavelength in m
     """
     E=12398.4/(l*u['ang'])
     return E
 
-def lam2f(l):  # noqa: E741
+def lam2f(l: float) -> float:
     """ Computes the photon frequency in Hz
         l is photon wavelength in m
     """
     f=c['c']/l
     return f
     
-def f2lam(f):
+def f2lam(f: float) -> float:
     """ Computes the photon wavelength in m
         f is the photon frequency in Hz
     """
     l=c['c']/f  # noqa: E741
     return l
  
-def f2E(f):
+def f2E(f: float) -> float:
     """ Computes the photon in energy in eV
         f is the photon frequency in Hz
     """
     E=c['h']*f*u['eV']
     return E
  
-def E2f(E):
+def E2f(E: float) -> float:
     """ Computes the photon frequency in Hz
         E is photon energy in eV or keV
     """
     f=E/c['h']/u['eV']
     return f
 
-def sind(A):
+def sind(A: float) -> float:
     """ Sin of an angle specified in degrees """
     Arad = np.deg2rad(A)
     x = np.sin(Arad) 
     return x
  
-def cosd(A):
+def cosd(A: float) -> float:
     """ Cos of an angle specified in degrees """
     Arad = np.deg2rad(A)
     x = np.cos(Arad) 
     return x
 
-def tand(A):
+def tand(A: float) -> float:
     """ Tan of an angle specified in degrees """
     Arad = np.deg2rad(A)
     x = np.tan(Arad) 
     return x
  
-def asind(x):
+def asind(x: float) -> float:
     """ Arcsin in degrees """
     A = np.arcsin(x)
     A = np.rad2deg(A) 
     return A
  
-def acosd(x):
+def acosd(x: float) -> float:
     """ Arccos in degrees """
     A = np.arccos(x)
     A = np.rad2deg(A) 
     return A
 
-def atand(x):
+def atand(x: float) -> float:
     """ Arctan in degrees """
     A = np.arctan(x)
     A = np.rad2deg(A) 
     return A
 
 
-def defaultDensity(matID):
+def defaultDensity(matID: str) -> float:
     """ Default material density """
     mat = goodID(matID)
     if matID in Density:
@@ -156,7 +156,7 @@ def defaultDensity(matID):
     return density
 
 
-def atomWeight(matID):
+def atomWeight(matID: str) -> float:
     """ Return the average atom weight in g/mol """
     mat = goodID(matID)
     compound = xl.CompoundParser(mat)
@@ -166,14 +166,14 @@ def atomWeight(matID):
     return mass
 
 
-def molarMass(matID):
+def molarMass(matID: str) -> float:
     """ Return the molar mass as g/mol """
     mat = goodID(matID)
     compound = xl.CompoundParser(mat)
     return atomWeight(matID) * compound['nAtomsAll']
 
 
-def mu(matID, keV, density=None):
+def mu(matID: str, keV: float, density: float = None) -> float:
     """ Calculate the mass attenuation coefficients (1/m) at given energies
           keV: energy in keV (vectorized)
           density in g/cm3, None=default density
@@ -193,12 +193,13 @@ def mu(matID, keV, density=None):
         return _mu
 
 
-def mu_en(matID, keV, density=None):
+def mu_en(matID: str, keV: float, density=None, suppressWarning=False) -> float:
     """ Calculate the mass energy-absorption coefficients (1/m) at given energies
           keV: energy in keV (vectorized)
           density in g/cm3, None=default density
     """
-    print('!!!\nWARNING: The CS_Energy cross section from xraylib is questionable at this time. Double check before using.\n!!!')
+    if not suppressWarning:
+        print('!!!\nWARNING: The CS_Energy cross section from xraylib is questionable at this time. Double check before using.\n!!!')
     mat = goodID(matID)
     if density is None:
         density = defaultDensity(matID)
@@ -213,7 +214,7 @@ def mu_en(matID, keV, density=None):
         return _mu
 
 
-def attenuationLength(matID, keV, density=None):
+def attenuationLength(matID: str, keV: float, density: float = None) -> float:
     """ Calculate the attenuation length (m) at given energies
           E in keV (vectorized)
           density in g/cm3, None=default density
@@ -221,7 +222,7 @@ def attenuationLength(matID, keV, density=None):
     return 1.0 / mu(matID, keV, density)
 
 
-def transmission(matID, t, keV, density=None):
+def transmission(matID: str, t: float, keV: float, density: float = None) -> float:
     """ Calculate the transmission at given thickness and energies
           t: thickness in m
           E: energies in keV (vectorized)
@@ -230,7 +231,7 @@ def transmission(matID, t, keV, density=None):
     return np.exp(-mu(matID, keV, density) * t)
 
 
-def eVatom(matID, keV, mJ, rms_mm, density=None):
+def eVatom(matID: str, keV: float, mJ: float, rms_mm: float, density: float = None) -> float:
     """ Calculate the eV/atom at given energies
           keV: energies in keV (vectorized)
           mJ: pulse energy in mJ (vectorized)
@@ -246,7 +247,7 @@ def eVatom(matID, keV, mJ, rms_mm, density=None):
     return EdensityJcm3 * atomVolcm3 / 1.6e-19
 
 
-def eVatom_en(matID, keV, mJ, rms_mm, density=None):
+def eVatom_en(matID: str, keV: float, mJ: float, rms_mm: float, density: float = None) -> float:
     """ Calculate the eV/atom at given energies with mu_en
           keV: energies in keV (vectorized)
           mJ: pulse energy in mJ (vectorized)
@@ -263,7 +264,7 @@ def eVatom_en(matID, keV, mJ, rms_mm, density=None):
     return EdensityJcm3 * atomVolcm3 / 1.6e-19 / natoms
 
 
-def eVatom_keV_plot(matID, keV, mJ, rms_mm, density=None, logx=False, logy=True):
+def eVatom_keV_plot(matID: str, keV: float, mJ: float, rms_mm: float, density: float = None, logx: bool = False, logy: bool = True):
     if not isinstance(matID, list):
         matID = [matID]
     
@@ -314,7 +315,7 @@ def eVatom_keV_plot(matID, keV, mJ, rms_mm, density=None, logx=False, logy=True)
         plt.show()
 
 
-def drillSpeed(matID, power_W, FWHM_mm, density=None):
+def drillSpeed(matID: str, power_W: float, FWHM_mm: float, density: float = None) -> float:
     """ Return the material drill speed (mm/s) based on vaporization heat """
     vaporH = {  # kJ/mol
         # spec heat from room temperature to melting + latent heat of fusion + spec heat from melting to boiling + latent heat of vaporization
@@ -335,12 +336,12 @@ def drillSpeed(matID, power_W, FWHM_mm, density=None):
     return power_W / (mol_mmD * vaporH[matID] * 1000)
 
 
-def drillTime(matID, thickness_mm, W, FWHM_mm):
+def drillTime(matID: str, thickness_mm: float, W: float, FWHM_mm: float) -> float:
     """ Return the material drill time based on vaporization heat """
     return thickness_mm / drillSpeed(matID, W, FWHM_mm)
 
 
-def drillSpeed_Diling(matID, mJ, keV, FWHM_mm, doseLimit = None, limitRatio = 1.0):
+def drillSpeed_Diling(matID: str, mJ: float, keV: float, FWHM_mm: float, doseLimit: float = None, limitRatio: float = 1.0) -> float:
     """ Return the material drill speed (mm/pulse) based on eV/atom limit
         * mJ: pulse energy in mJ
         * kHz: repetition rate in kHz
@@ -593,7 +594,7 @@ def spectrum_shield(spectrum, area_cm2, matID, density=None, eVrange=(0.0,0.0), 
     return t1
 
 
-def plot(x, y, xlabel=None, ylabel=None, title=None, figsize=(4.5,3), logx=False, logy=False, xmin=None, xmax=None, ymin=None, ymax=None, savefig=None):
+def plot(x, y, xlabel=None, ylabel=None, title=None, figsize=(4.5,3), logx=False, logy=False, xmin=None, xmax=None, ymin=None, ymax=None, hLine=None, vLine=None, savefig=None):
     ''' Plot function
     '''
     plt.figure(figsize=figsize, dpi=100, facecolor='white')
@@ -632,6 +633,17 @@ def plot(x, y, xlabel=None, ylabel=None, title=None, figsize=(4.5,3), logx=False
         plt.xlabel(xlabel)
     if ylabel is not None:
         plt.ylabel(ylabel)
+
+    if hLine is not None:
+        if np.isscalar(hLine):
+            hLine = [hLine]
+        for h in hLine:
+            plt.axhline(y=h, color='r', linestyle='--', linewidth=1)
+    if vLine is not None:
+        if np.isscalar(vLine):
+            vLine = [vLine]
+        for v in vLine:
+            plt.axvline(x=v, color='r', linestyle='--', linewidth=1)
 
     plt.grid(True)
     plt.tight_layout()
@@ -1571,6 +1583,24 @@ def propagateThinLens(q_in, f_m):
 #     """
 #     Re = R * np.cos(theta)
 #     return 1 / (1/q_in - 2/Re)
+
+def getFocalDistance(q: complex) -> float:
+    """ get focal distance from q
+
+    Args:
+        q (complex, array_like): complex Gaussian beam
+
+    Returns:
+        f_m (float, array_like): focal distance in m
+    """
+    d = -(q.real)
+    if np.isscalar(d):
+        if d <= 0:
+            d = np.inf
+    else:
+        idx = d <= 0
+        d[idx] = np.inf
+    return d
 
 
 def getGaussianSigma_um(q, keV, M_square=1.0):

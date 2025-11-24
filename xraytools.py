@@ -1476,13 +1476,14 @@ def lamda2keV(lamda_nm):
 
 
 ## Gaussian beam propogation
-def RayleighLength(keV, sigma0_um, n=1):
+def RayleighLength(keV, w0_um, n=1, M_squared=1.0):
     ''' Return the Rayleigh range in m (SI unit)
        keV: photon energy in keV
-       sigma0_um: sigma in um
+       w0_um: waist radius in um
        n:   refractive index of the medium (default 1 for vacuum). Not tested for non-vacuum yet.
+       M_squared: M^2 factor of the beam (default 1 for ideal Gaussian beam)
     '''
-    return 4 * np.pi * (sigma0_um*1e-6)**2 * n / keV2lamda(keV)
+    return np.pi * (w0_um*1e-6)**2 * n / keV2lamda(keV) / M_squared
 
 def LensFocalLength(keV, radius_um, matID='Be'):
     ''' Return the focal length of a lens in m
@@ -1536,33 +1537,33 @@ def LensFocalSigma(s, f, LR, sigma0):
         return sigma
 
 
-def initGaussianBeam(keV, sigma0_um, M_square=1.0):
-    """_summary_
+def initGaussianBeam(keV, sigma0_um, M_squared=1.0):
+    """ Initialize a Gaussian beam q parameter
 
     Args:
         keV (float, array_like): keV
-        sigma0_um (float, array_like): sigma in um
-        M_square(float, array_like): M^2. Default to 1.
+        sigma0_um (float, array_like): waist rms for intensity in um. Note: waist radius w0 = 2*sigma0.
+        M_squared(float, array_like): M^2. Default to 1.
     Returns:
         complex, array_like: q of Gaussian beam
-    """    
-    zR = RayleighLength(keV, sigma0_um)
-    return zR / M_square * 1j
+    """
+    w0_um = sigma0_um * 2
+    zR = RayleighLength(keV, w0_um, M_squared=M_squared)
+    return zR * 1j
 
 def propagateFreeSpace(q_in, d_m):
-    """ free space propogation
+    """ free space propagation
 
     Args:
         q_in (complex, array_like): input Gaussian Beam, SI unit
-        d_m (float, array_like): free space lengh in meters
-
+        d_m (float, array_like): free space length in meters
     Returns:
         q_out (complex, array_like): q out
     """
     return q_in + d_m
 
 def propagateThinLens(q_in, f_m):
-    """ thin lens propogation
+    """ thin lens propagation
     Args:
         q_in (complex, array_like): input Gaussian Beam, SI unit
         f_m (float, array_like): lens focal length in meters
@@ -1585,7 +1586,7 @@ def propagateThinLens(q_in, f_m):
 #     return 1 / (1/q_in - 2/Re)
 
 def getFocalDistance(q: complex) -> float:
-    """ get focal distance from q
+    """ get focal distance from q: for focusing beam, the negative of real(q) is the focal distance.
 
     Args:
         q (complex, array_like): complex Gaussian beam
@@ -1598,25 +1599,99 @@ def getFocalDistance(q: complex) -> float:
         if d <= 0:
             d = np.inf
     else:
-        idx = d <= 0
-        d[idx] = np.inf
+        d[d <= 0] = np.inf
     return d
 
 
-def getGaussianSigma_um(q, keV, M_square=1.0):
-    """ get sigma in um of q
+def getGaussianSigma_um(q, keV, M_squared=1.0):
+    """ get the rms of beam size corresponding to beam intensity in um from q
 
     Args:
         q (complex, array_like): complex Gaussian beam
         keV (float, array_like): keV
-        M_square (float, array_like): M^2, beam quality factor. Default to 1.
+        M_squared (float, array_like): M^2, beam quality factor. Default to 1.
 
     Returns:
-        sigma_um (float, array_like): sigma size in um
+        sigma_um (float, array_like): rms size for intensity in um. Note: waist radius w = 2*sigma.
     """
     im = (1/q).imag
     lamda = keV2lamda(keV)
-    return np.sqrt(-M_square * lamda / (4 * np.pi * im)) * 1e6
+    wz_um = np.sqrt(-lamda * M_squared / (np.pi * im)) * 1e6
+    return wz_um / 2
+
+
+def getWz_m(q, keV, M_squared=1.0):
+    """ get the waist size in m from q
+
+    Args:
+        q (complex, array_like): complex Gaussian beam
+        keV (float, array_like): keV
+        M_squared (float, array_like): M^2, beam quality factor. Default to 1.
+
+    Returns:
+        wz_m (float, array_like): waist size at z in m
+    """
+    im = (1/q).imag
+    lamda = keV2lamda(keV)
+    return np.sqrt(-lamda * M_squared / (np.pi * im))
+
+
+def getW0_m(q, keV, M_squared=1.0):
+    """ get the waist radius w0 in m from q. Note the intensity rms size sigma_r = w0/2
+
+    Args:
+        q (complex, array_like): complex Gaussian beam
+        keV (float, array_like): keV
+        M_squared (float, array_like): M^2, beam quality factor. Default to 1.
+
+    Returns:
+        w0_um (float, array_like): waist size in m
+    """
+    ZR = q.imag
+    lamda = keV2lamda(keV)
+    return np.sqrt(ZR * lamda * M_squared / np.pi)
+
+
+def getTheta0_rad(q, keV, M_squared=1.0):
+    """ get divergence angle in rad from q. Note the intensity rms angle sigma_theta = theta/2
+
+    Args:
+        q (complex, array_like): complex Gaussian beam
+        keV (float, array_like): keV
+        M_squared (float, array_like): M^2, beam quality factor. Default to 1.
+
+    Returns:
+        theta_rad (float, array_like): divergence angle in rad
+    """
+    ZR = q.imag
+    lamda = keV2lamda(keV)
+    return np.sqrt(lamda * M_squared / (np.pi * ZR))
+
+
+def getThetaZ_rad(q, keV, M_squared=1.0):
+    """ get waist angle at z in rad from q. Note the intensity rms angle sigma_theta = theta/2
+
+    Args:
+        q (complex, array_like): complex Gaussian beam
+        keV (float, array_like): keV
+        M_squared (float, array_like): M^2, beam quality factor. Default to 1.
+
+    Returns:
+        thetaZ_rad (float, array_like): waist angle at z in rad
+    """
+    w0_wz_squared = -(1/q).imag * q.imag  # (w0/wz)^2
+    theta0 = getTheta0_rad(q, keV, M_squared)
+    return theta0 * np.sqrt(1 - w0_wz_squared)
+
+
+def getR_m(q):
+    """ get radius of curvature from q
+        return np.inf if real(q) == 0
+
+    Args:
+        q (complex, array_like): complex Gaussian beam
+    """
+    return 1 / (1/q).real
 
 
 class GaussianBeam:
@@ -2755,7 +2830,8 @@ latticeParameters = {
      'Na':(4.225,4.225,4.225,90,90,90),
      'Mg':(3.21,3.21,5.21,90,90,120),
      'Al':(4.05,4.05,4.05,90,90,90),
-     'Si':(5.4310205,5.4310205,5.4310205,90,90,90),
+     'Si':(5.4309,5.4309,5.4309,90,90,90),  # values in X0h
+    #  'Si':(5.4310205,5.4310205,5.4310205,90,90,90),  # original value from D. Fritz
      'Ar':(5.31,5.31,5.31,90,90,90),
      'K':(5.225,5.225,5.225,90,90,90),
      'Ca':(5.58,5.58,5.58,90,90,90),

@@ -1771,6 +1771,22 @@ class GaussianBeam:
         ''' Reset '''
         pass
 
+
+def GratingDiffractionAngle(keV, d_m, theta_i_rad=0, order=1, supress_error=False):
+    ''' Calculate diffraction angle for a grating
+        keV: photon energy in keV
+        d_m: grating period in m
+        theta_i_rad: incidence angle in rad, 0 for normal incidence
+        order: diffraction order, default to 1
+    '''
+    lamda = keV2lamda(keV)
+    sin_theta_d = order * lamda / d_m + np.sin(theta_i_rad)
+    if not supress_error and (sin_theta_d > 1 or sin_theta_d < -1):
+        raise ValueError(f'Diffraction angle is invalid for the given parameters: keV={keV}, d_m={d_m}, theta_i_rad={theta_i_rad}, order={order}: order * lamda / d_m - sin(theta_i_rad) = {sin_theta_d}.')
+    theta_d_rad = np.arcsin(sin_theta_d)
+    return theta_d_rad
+
+
 """ Define units and constants
     - Muliply to convert from SI unit to the target unit:
         e.g. a*u['cm'] to get from m to cm
@@ -2914,7 +2930,7 @@ latticeParameters = {
  
 # specific heat capacity coefficients
 # Shomate equation
-# Cp = A + B*T + C*T^2 + D*T^3 + E/T^2
+# Cp (J/mol/K) = A + B*T + C*T^2 + D*T^3 + E/T^2
 #   T = temperature(K)/1000
 specificHeatParams = {
     'Li':(169.552,-882.711,1977.438,-1487.312,-1.609635),

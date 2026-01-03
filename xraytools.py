@@ -942,7 +942,11 @@ def BraggAngle(ID,hkl,E=None):
     """
     E = eV(E)
     d = dSpace(ID,hkl)
-    theta = asind(lam(E)/2/d)
+    sinv = lam(E)/2/d
+    if sinv > 1.0:
+        theta = np.nan
+    else:
+        theta = asind(sinv)
     return theta
 
 
@@ -1551,7 +1555,7 @@ def initGaussianBeam(keV, sigma0_um, M_squared=1.0):
     zR = RayleighLength(keV, w0_um, M_squared=M_squared)
     return zR * 1j
 
-def propagateFreeSpace(q_in, d_m):
+def propagateFreeSpace(q_in:complex, d_m:float) -> complex:
     """ free space propagation
 
     Args:
@@ -1562,7 +1566,7 @@ def propagateFreeSpace(q_in, d_m):
     """
     return q_in + d_m
 
-def propagateThinLens(q_in, f_m):
+def propagateThinLens(q_in:complex, f_m:float) -> complex:
     """ thin lens propagation
     Args:
         q_in (complex, array_like): input Gaussian Beam, SI unit
@@ -1603,7 +1607,7 @@ def getFocalDistance(q: complex) -> float:
     return d
 
 
-def getGaussianSigma_um(q, keV, M_squared=1.0):
+def getIntensitySigma_um(q, keV, M_squared=1.0):
     """ get the rms of beam size corresponding to beam intensity in um from q
 
     Args:
@@ -1618,6 +1622,19 @@ def getGaussianSigma_um(q, keV, M_squared=1.0):
     lamda = keV2lamda(keV)
     wz_um = np.sqrt(-lamda * M_squared / (np.pi * im)) * 1e6
     return wz_um / 2
+
+def getIntensitySigma(q, keV, M_squared=1.0):
+    """ get the rms of beam size corresponding to beam intensity in um from q
+
+    Args:
+        q (complex, array_like): complex Gaussian beam
+        keV (float, array_like): keV
+        M_squared (float, array_like): M^2, beam quality factor. Default to 1.
+
+    Returns:
+        sigma_um (float, array_like): rms size for intensity in um. Note: waist radius w = 2*sigma.
+    """
+    return getWz_m(q, keV, M_squared) / 2
 
 
 def getWz_m(q, keV, M_squared=1.0):
@@ -1679,9 +1696,12 @@ def getThetaZ_rad(q, keV, M_squared=1.0):
     Returns:
         thetaZ_rad (float, array_like): waist angle at z in rad
     """
-    w0_wz_squared = -(1/q).imag * q.imag  # (w0/wz)^2
-    theta0 = getTheta0_rad(q, keV, M_squared)
-    return theta0 * np.sqrt(1 - w0_wz_squared)
+    # w0_wz_squared = -(1/q).imag * q.imag  # (w0/wz)^2
+    # theta0 = getTheta0_rad(q, keV, M_squared)
+    # return theta0 * np.sqrt(1 - w0_wz_squared)
+    wz = getWz_m(q, keV, M_squared)
+    Rz_reciprocal = (1/q).real
+    return wz * Rz_reciprocal
 
 
 def getR_m(q):

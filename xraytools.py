@@ -1792,15 +1792,18 @@ class GaussianBeam:
         pass
 
 
-def GratingDiffractionAngle(keV, d_m, theta_i_rad=0, order=1, supress_error=False):
+def GratingDiffractionAngle(keV, d_m, theta_i_rad=0.0, order=1, supress_error=False):
     ''' Calculate diffraction angle for a grating
         keV: photon energy in keV
         d_m: grating period in m
         theta_i_rad: incidence angle in rad, 0 for normal incidence
         order: diffraction order, default to 1
+        
+        Return: diffraction angle (relative to the normal) at the m-th order theta_m in rad
+          theta_i and theta_m have the same sign if they are on the *same* side of the normal
     '''
     lamda = keV2lamda(keV)
-    sin_theta_d = order * lamda / d_m + np.sin(theta_i_rad)
+    sin_theta_d = order * lamda / d_m - np.sin(theta_i_rad)
     if not supress_error and (sin_theta_d > 1 or sin_theta_d < -1):
         raise ValueError(f'Diffraction angle is invalid for the given parameters: keV={keV}, d_m={d_m}, theta_i_rad={theta_i_rad}, order={order}: order * lamda / d_m - sin(theta_i_rad) = {sin_theta_d}.')
     theta_d_rad = np.arcsin(sin_theta_d)

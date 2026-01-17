@@ -1624,7 +1624,7 @@ def getIntensitySigma_um(q, keV, M_squared=1.0):
     return wz_um / 2
 
 def getIntensitySigma(q, keV, M_squared=1.0):
-    """ get the rms of beam size corresponding to beam intensity in um from q
+    """ get the rms of beam size corresponding to beam intensity in m from q
 
     Args:
         q (complex, array_like): complex Gaussian beam
@@ -1632,7 +1632,7 @@ def getIntensitySigma(q, keV, M_squared=1.0):
         M_squared (float, array_like): M^2, beam quality factor. Default to 1.
 
     Returns:
-        sigma_um (float, array_like): rms size for intensity in um. Note: waist radius w = 2*sigma.
+        sigma (float, array_like): rms size for intensity in m. Note: waist radius w = 2*sigma.
     """
     return getWz_m(q, keV, M_squared) / 2
 

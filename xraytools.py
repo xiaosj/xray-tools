@@ -1173,7 +1173,15 @@ def getX0h(matID, keV, hkl, url='https://x-server.gmca.aps.anl.gov/cgi/x0h_form.
     }
     
     # Connect & Download
-    response = requests.get(url, params=params)
+    with requests.get(url, params=params) as response:
+        if response.status_code != 200:
+            print(f"Warning: Failed to retrieve data from {url}. Status code: {response.status_code}")
+            print('Parameters used for the request:')
+            for key, value in params.items():
+                print(f"  {key}: {value}")
+            return None
+        else:
+            return response
 
     # Example to read the data
     # content = response.text
@@ -1181,8 +1189,6 @@ def getX0h(matID, keV, hkl, url='https://x-server.gmca.aps.anl.gov/cgi/x0h_form.
     # DarwinWidth = float(content.split('FWHMurad_sg= ')[1].strip().split(' ')[0]) * 1e-6
     # prcnsg: relative diffraction intensity for sigma polarization
     # xh_x0 = float(content.split('prcnsg= ')[1].strip().split(' ')[0]) * 0.01
-
-    return response
 
 
 def getX0h_plane(matID, keV, hkl_min, hkl_max, qb1=0., qb2=90., prcmin=0.1, df1df2=-1, hkl_base=(1,1,1), q1=0., q2=180., url='https://x-server.gmca.aps.anl.gov/cgi/x0p_form.pl'):
@@ -1257,7 +1263,15 @@ def getX0h_plane(matID, keV, hkl_min, hkl_max, qb1=0., qb2=90., prcmin=0.1, df1d
     }
 
     # Connect & Download
-    response = requests.get(url, params=params)
+    with requests.get(url, params=params) as response:
+        if response.status_code != 200:
+            print(f"Warning: Failed to retrieve data from {url}. Status code: {response.status_code}.")
+            print('Parameters used for the request:')
+            for key, value in params.items():
+                print(f"  {key}: {value}")
+            return None
+        else:
+            return response
 
     # Example to read the data
     # import pandas as pd

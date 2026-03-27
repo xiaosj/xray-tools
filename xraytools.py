@@ -1825,6 +1825,60 @@ def GratingDiffractionAngle(keV, d_m, theta_i_rad=0.0, order=1, supress_error=Fa
     return theta_d_rad
 
 
+def TransmissionGratingEfficiency(keV: float, m: int, thickness_um: float, duty_cycle: float, element: str, density: float = None):
+    """
+    Calculates the m-th order efficiency of a binary transmission grating.
+    Note:
+      1. This is a simplified model and may not capture all the complexities of real gratings, such as edge effects, non-rectangular profiles, or multiple scattering.
+      2. This is independent of the grating pitch
+    
+    Parameters:
+    keV          : Photon energy in keV (can be an array) [This is only partially vectorized, because the xraylib calls are not vectorized.]
+    m            : Diffraction order (integer)
+    thickness_um : Grating bar thickness (height) in microns
+    duty_cycle   : Ratio of bar width to period (f)
+    element      : Material symbol
+    density      : Material density in g/cm^3. If None, will the default value
+    """
+    if np.isscalar(keV):
+        keV = np.array([keV], dtype=np.float64)
+
+    # 1. Constants and Wavelength
+    # lambda [m] = 1.2398e-9 / E [keV]
+    wavelength = 1.2398e-9 / keV
+    k = 2 * np.pi / wavelength
+    t = thickness_um * 1e-6
+    
+    # 2. Get Optical Constants from xraylib
+    # xraylib.Refractive_Index_Re returns (1 - delta)
+    if density is None:
+        density = Density[element]
+    delta = np.array([1.0 - xl.Refractive_Index_Re(element, _keV, density) for _keV in keV])
+    beta = np.array([xl.Refractive_Index_Im(element, _keV, density) for _keV in keV])
+    
+    # 3. Calculate Phase and Absorption
+    delta_phi = k * delta * t
+    mu_t = 2 * k * beta * t  # Since mu = 4*pi*beta/lambda
+    
+    # 4. General Efficiency Equation
+    if m == 0:
+        # Zero-th order (direct beam)
+        term1 = (1 - duty_cycle)**2
+        term2 = (duty_cycle**2) * np.exp(-mu_t)
+        term3 = 2 * duty_cycle * (1 - duty_cycle) * np.exp(-mu_t / 2) * np.cos(delta_phi)
+        efficiency = term1 + term2 + term3
+    else:
+        # Higher orders m
+        geometric_factor = (np.sin(m * np.pi * duty_cycle) / (m * np.pi))**2
+        material_factor = 1 + np.exp(-mu_t) - 2 * np.exp(-mu_t / 2) * np.cos(delta_phi)
+        efficiency = geometric_factor * material_factor
+    
+    if np.isscalar(keV):
+        return efficiency[0]
+    else:
+        return efficiency
+
+
 """ Define units and constants
     - Muliply to convert from SI unit to the target unit:
         e.g. a*u['cm'] to get from m to cm
